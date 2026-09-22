@@ -1,6 +1,18 @@
 # GitHub and Vercel deployment
 
-The selected frontend deployment target is Vercel, connected to GitHub. No deployment has been created yet. Read STATUS.md for application limitations.
+The storefront is deployed at https://basket-arhanquikit.vercel.app from https://github.com/arhanali003/basket. Read STATUS.md for application limitations.
+
+## Backend deployment in progress
+
+Create a separate Vercel project with root apps/api and the NestJS preset. Its vercel.json generates the PostgreSQL Prisma client before compiling. This does not migrate or seed a database during builds, so preview builds cannot change production data.
+
+The planned database is Neon PostgreSQL through Vercel Marketplace. Installing that integration requires the account owner's acceptance of the displayed terms. Provision a free plan if available; do not select a paid plan without authorization. No database has been provisioned yet.
+
+Before deploying the API, connect the database to that API project, configure DATABASE_URL privately, NODE_ENV=production, MOCK_PROVIDERS=false, CORS_ORIGINS=https://basket-arhanquikit.vercel.app and a strong private DELIVERY_CODE_SECRET. Run the reviewed production migration against the new database, then seed catalogue data without development staff accounts. Keep Firebase service credentials out of Git and frontend variables.
+
+After API readiness and catalogue checks pass, configure the storefront API endpoint and verify browser access. Auth still needs the production Firebase browser flow and same-origin cookie routing. Socket.IO requires distributed coordination for multiple instances; the existing polling fallback is available. The BullMQ maintenance worker still needs a separate worker host or a deliberately implemented scheduled replacement; a Vercel HTTP function does not run it continuously.
+
+## Frontend configuration
 
 Import the same GitHub repository as three separate Vercel projects:
 
