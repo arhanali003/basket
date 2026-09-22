@@ -8,7 +8,7 @@ Source: https://github.com/arhanali003/basket. Read STATUS.md for application li
 - Backend: https://basket-api-eight.vercel.app (Vercel project `basket-api`, root `apps/api`, NestJS preset).
 - Database: Neon PostgreSQL Free, connected privately to the API production environment through Vercel Marketplace.
 
-The production migration and catalogue seed have run. The database contains 16 products across 8 categories; production seeding skips development accounts. API health, database readiness, catalogue loading, checkout quotes, rejected untrusted origins and unauthenticated access checks passed on 2026-09-22. Admin and delivery apps are not deployed.
+The production migration and catalogue seed have run. The database contains 16 products across 8 categories; production seeding skips development accounts. API health, database readiness, catalogue loading, checkout quotes, rejected untrusted origins and unauthenticated access checks passed on 2026-09-22. The admin login page is deployed at https://basket-admin-delta.vercel.app (`basket-admin`, root `apps/admin`); owner authentication setup is incomplete. The delivery app is not deployed.
 
 The API build script generates the PostgreSQL Prisma client and compiles the application. Production builds also apply committed migrations; `SEED_CATALOGUE=true` runs a create-only catalogue seed. Preview builds do not migrate or seed production data. Review migrations before pushing to the production branch.
 
@@ -41,3 +41,9 @@ Keep .env files, Firebase service-account JSON, private keys, local databases an
 Vercel Hobby is restricted to personal, non-commercial projects. A commercial store needs an appropriate plan; switching providers does not guarantee that the complete platform is free.
 
 References: https://vercel.com/docs/monorepos and https://vercel.com/docs/plans/hobby
+
+## Admin sign-in setup
+
+The admin production build uses Firebase Google sign-in and same-origin API proxying. Configure `API_ORIGIN`, `NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`, and `NEXT_PUBLIC_FIREBASE_PROJECT_ID` in the admin project before building. Local demo login remains development-only.
+
+Before owner access works, enable the Firebase Google provider, authorize the admin domain, configure backend Firebase credentials for revoked-token checks, and provision the chosen verified Firebase UID with `super_admin` in the database. Never promote an account based solely on an unverified client-supplied email or role. Add the exact deployed admin origin to the API's `CORS_ORIGINS`. Verify unauthorized requests fail and a real owner can sign in before calling management access ready.
