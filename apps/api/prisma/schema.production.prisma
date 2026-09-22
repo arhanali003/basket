@@ -1,0 +1,198 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+model User {
+  id String @id @default(cuid())
+  phone String? @unique
+  email String? @unique
+  name String
+  role String @default("customer")
+  firebaseUid String? @unique
+  createdAt DateTime @default(now())
+  sessions Session[]
+  addresses Address[]
+  orders Order[]
+  cart CartItem[]
+  wishlist Wishlist[]
+}
+model Session {
+  id String @id
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  @@index([userId])
+}
+model Address {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label String @default("Home")
+  recipient String
+  phone String
+  line String
+  city String
+  state String
+  pincode String
+  latitude Float
+  longitude Float
+  instructions String @default("")
+  @@index([userId])
+}
+model Store {
+  id String @id
+  name String
+  latitude Float
+  longitude Float
+  radiusKm Float
+  active Boolean @default(true)
+  inventory Inventory[]
+  orders Order[]
+}
+model Category {
+  id String @id
+  name String
+  image String
+  color String
+  products Product[]
+}
+model Product {
+  id String @id @default(cuid())
+  name String
+  slug String @unique
+  categoryId String
+  category Category @relation(fields: [categoryId], references: [id])
+  brand String
+  description String
+  image String
+  unit String
+  price Int
+  mrp Int
+  taxBps Int @default(0)
+  maxQuantity Int @default(10)
+  active Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  inventory Inventory[]
+  cart CartItem[]
+  wishlist Wishlist[]
+  @@index([categoryId, active])
+}
+model Inventory {
+  id String @id @default(cuid())
+  storeId String
+  productId String
+  store Store @relation(fields: [storeId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+  available Int
+  reserved Int @default(0)
+  sold Int @default(0)
+  damaged Int @default(0)
+  lowStockThreshold Int @default(5)
+  @@unique([storeId, productId])
+}
+model InventoryMovement {
+  id String @id @default(cuid())
+  storeId String
+  productId String
+  quantity Int
+  reason String
+  reference String
+  createdAt DateTime @default(now())
+  @@index([productId, createdAt])
+}
+model CartItem {
+  id String @id @default(cuid())
+  userId String
+  productId String
+  quantity Int
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  @@unique([userId, productId])
+}
+model Wishlist {
+  id String @id @default(cuid())
+  userId String
+  productId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  @@unique([userId, productId])
+}
+model Coupon {
+  code String @id
+  discountBps Int
+  minimum Int
+  maximum Int
+  active Boolean @default(true)
+}
+model Order {
+  id String @id @default(cuid())
+  userId String
+  storeId String
+  user User @relation(fields: [userId], references: [id])
+  store Store @relation(fields: [storeId], references: [id])
+  idempotencyKey String
+  requestHash String
+  status String @default("placed")
+  addressJson String
+  subtotal Int
+  discount Int
+  deliveryFee Int
+  handlingFee Int
+  tax Int
+  total Int
+  paymentMethod String
+  paymentStatus String
+  driverId String?
+  deliveryCodeHash String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  items OrderItem[]
+  history OrderHistory[]
+  locations LocationSample[]
+  @@unique([userId, idempotencyKey])
+  @@index([status, createdAt])
+  @@index([driverId])
+}
+model OrderItem {
+  id String @id @default(cuid())
+  orderId String
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  name String
+  unit String
+  image String
+  quantity Int
+  price Int
+}
+model OrderHistory {
+  id String @id @default(cuid())
+  orderId String
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status String
+  createdAt DateTime @default(now())
+}
+model LocationSample {
+  id String @id @default(cuid())
+  orderId String
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  latitude Float
+  longitude Float
+  accuracy Float
+  createdAt DateTime @default(now())
+  @@index([orderId, createdAt])
+}
+model AuditLog {
+  id String @id @default(cuid())
+  actorId String
+  action String
+  entityId String
+  createdAt DateTime @default(now())
+}
+model WebhookEvent {
+  id String @id
+  createdAt DateTime @default(now())
+}

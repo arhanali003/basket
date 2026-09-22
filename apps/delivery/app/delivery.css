@@ -1,0 +1,174 @@
+.partner-app {
+  max-width: 560px;
+  margin: auto;
+  background: var(--cream);
+  min-height: 100dvh;
+  border-inline: 1px solid var(--line);
+}
+.partner-header {
+  padding: 25px 24px;
+  background: #fffefb;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.partner-header .logo {
+  font-size: 24px;
+}
+.partner-header .logo-icon {
+  width: 32px;
+  height: 34px;
+}
+.partner-main {
+  padding: 27px 24px;
+}
+.partner-welcome {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 25px;
+}
+.partner-welcome h1 {
+  font-size: 27px;
+  margin: 8px 0;
+}
+.partner-welcome p {
+  font-size: 12px;
+  color: var(--muted);
+}
+.partner-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #e4ead7;
+  display: grid;
+  place-items: center;
+  color: #617649;
+}
+.partner-summary {
+  background: var(--green);
+  color: white;
+  border-radius: 17px;
+  padding: 24px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 25px;
+}
+.partner-summary small {
+  font-size: 10px;
+  color: #bdd1ad;
+}
+.partner-summary b {
+  font-size: 30px;
+  font-weight: 400;
+  display: block;
+  margin-top: 7px;
+}
+.partner-summary > div + div {
+  border-left: 1px solid #ffffff30;
+  padding-left: 24px;
+}
+.delivery-card {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 20px;
+  margin: 15px 0;
+}
+.delivery-card h3 {
+  font-size: 17px;
+}
+.delivery-route {
+  margin: 20px 0;
+  padding-left: 24px;
+  position: relative;
+}
+.delivery-route:before {
+  content: '';
+  position: absolute;
+  top: 5px;
+  bottom: 24px;
+  left: 5px;
+  border-left: 1px dashed #aabb9c;
+}
+.route-stop {
+  margin: 20px 0;
+  position: relative;
+}
+.route-stop:before {
+  content: '';
+  position: absolute;
+  left: -23px;
+  top: 3px;
+  height: 8px;
+  width: 8px;
+  border-radius: 50%;
+  background: #89a66d;
+}
+.route-stop:last-child:before {
+  background: var(--orange);
+}
+.route-stop small {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.route-stop b {
+  font-size: 12px;
+  display: block;
+  margin: 6px 0;
+}
+.route-stop p {
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+.delivery-card .payment-due {
+  border-top: 1px dashed var(--line);
+  padding-top: 15px;
+  font-size: 12px;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.gps-status {
+  font-size: 11px;
+  line-height: 1.8;
+  padding: 13px;
+  background: #edf2e5;
+  border-radius: 9px;
+  margin: 14px 0;
+}
+.partner-login {
+  padding: 50px 26px;
+}
+.partner-login h1 {
+  font-size: 39px;
+  font-family: Georgia, serif;
+  font-weight: 400;
+  line-height: 1.12;
+  margin: 30px 0 15px;
+}
+.partner-login p {
+  font-size: 12px;
+  line-height: 1.8;
+  color: var(--muted);
+}
+.partner-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 25px 0 8px;
+}
+.partner-section-heading h2 {
+  font-size: 20px;
+}
+.partner-footnote {
+  font-size: 10px;
+  line-height: 1.8;
+  color: var(--muted);
+  text-align: center;
+  padding: 20px 0 30px;
+}

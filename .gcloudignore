@@ -1,0 +1,25 @@
+# Exclude local configuration, credentials, databases and generated files from
+# Google Cloud source uploads. Keep this file in the upload for auditability.
+.git/
+.gcloudignore
+#!include:.gitignore
+**/node_modules/
+**/.next/
+**/dist/
+**/.turbo/
+**/.env*
+**/*serviceAccount*.json
+**/*service-account*.json
+**/*firebase-admin*.json
+**/*credentials*.json
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/*.db*
+**/*.sqlite*
+artifacts/
+/public/
+server.py
+server.js
+data*.json

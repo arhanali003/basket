@@ -1,0 +1,41 @@
+# Deployment template: not launch-ready. Complete docs/STATUS.md before public launch.
+services:
+  - type: web
+    name: daybasket-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile.api
+    region: singapore
+    plan: starter
+    healthCheckPath: /api/v1/ready
+    preDeployCommand: node node_modules/prisma/build/index.js migrate deploy --schema apps/api/prisma/schema.production.prisma
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MOCK_PROVIDERS
+        value: "false"
+      - key: PORT
+        value: "4000"
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: DELIVERY_CODE_SECRET
+        generateValue: true
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+  - type: worker
+    name: daybasket-maintenance
+    runtime: docker
+    dockerfilePath: ./Dockerfile.api
+    region: singapore
+    plan: starter
+    dockerCommand: node apps/api/dist/apps/api/src/worker.js
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: LOCATION_RETENTION_DAYS
+        value: "7"
