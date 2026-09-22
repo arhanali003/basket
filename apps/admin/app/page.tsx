@@ -19,6 +19,7 @@ import {
   Users,
   Wallet,
 } from 'lucide-react';
+import { signInOwner } from './sign-in';
 import { api, request } from '@daybasket/api-client';
 import {
   type Product,
@@ -103,7 +104,14 @@ export default function Admin() {
     setBusy(true);
     setError('');
     try {
-      const u = await request<User>('/auth/staff', 'POST', { role: 'super_admin', password });
+      const u =
+        process.env.NODE_ENV === 'production'
+          ? await signInOwner()
+          : await request<User>('/auth/staff', 'POST', { role: 'super_admin', password });
+      if (u.role !== 'super_admin') {
+        await request('/auth/logout', 'POST', {});
+        throw new Error('This account does not have store owner access.');
+      }
       setUser(u);
       await refresh();
     } catch (e) {
@@ -265,24 +273,33 @@ export default function Admin() {
             <span className="eyebrow">WELCOME BACK</span>
             <h2 style={{ marginTop: 15 }}>Your store, at a glance.</h2>
             <p>Sign in to manage your products, orders and deliveries.</p>
-            <div className="demo-note">
-              Local demo · owner password: <b>daybasket-local-only</b>
-              <br />
-              Production requires a provisioned Firebase staff account.
-            </div>
-            <label className="field">
-              Store password
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                autoComplete="current-password"
-              />
-            </label>
+            {process.env.NODE_ENV !== 'production' && (
+              <>
+                <div className="demo-note">
+                  Local demo · owner password: <b>daybasket-local-only</b>
+                  <br />
+                  Production requires a provisioned Firebase staff account.
+                </div>
+                <label className="field">
+                  Store password
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    autoComplete="current-password"
+                  />
+                </label>
+              </>
+            )}
             {error && <ErrorNotice message={error} />}
             <button className="primary full" disabled={busy}>
-              Open store studio <ArrowRight size={15} />
+              {busy
+                ? 'Signing in…'
+                : process.env.NODE_ENV === 'production'
+                  ? 'Continue with Google'
+                  : 'Open store studio'}{' '}
+              <ArrowRight size={15} />
             </button>
             <p style={{ marginTop: 24, fontSize: 10 }}>Restricted to authorized store staff.</p>
           </form>
@@ -328,7 +345,7 @@ export default function Admin() {
           <p>
             Indiranagar, Bengaluru
             <br />
-            Development store
+            {process.env.NODE_ENV === 'production' ? 'Store management' : 'Development store'}
           </p>
           <button
             className="flex"
@@ -348,7 +365,9 @@ export default function Admin() {
             <Store size={16} /> Indiranagar store <span className="muted"> / {tab}</span>
           </span>
           <span className="store-badge">
-            <span>●</span> Local development <span style={{ marginLeft: 12 }}>Owner</span>
+            <span>●</span>{' '}
+            {process.env.NODE_ENV === 'production' ? 'Store management' : 'Local development'}{' '}
+            <span style={{ marginLeft: 12 }}>Owner</span>
           </span>
         </header>
         <div className="studio-content">
