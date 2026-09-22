@@ -35,7 +35,7 @@ All requested analytics/comparisons, stock/customer/catalogue CSV import/export 
 
 - Original legacy files are preserved and excluded from new checks; their old endpoints are not part of Daybasket.
 - Development mock login cannot run under NODE_ENV=production. Existing mock users never become production Firebase staff automatically.
-- Storefront and API are deployed on Vercel with Neon PostgreSQL; see VERCEL.md for public URLs and verified checks. The admin login page is hosted, but Firebase provider/backend credentials and owner provisioning remain incomplete. The delivery app and Redis/BullMQ worker are not hosted. Production identity and payment setup remain incomplete; no real payment was performed.
+- Storefront and API are deployed on Vercel with Neon PostgreSQL; see VERCEL.md for public URLs and verified checks. The admin login page and verified-Google owner provisioning code are hosted; activating the authorized admin domain and backend owner allowlist remains pending. The delivery app and Redis/BullMQ worker are not hosted. Production identity and payment setup remain incomplete; no real payment was performed.
 - Maps/email/SMS/storage are not integrated. Placeholder configuration is documented, not represented as finished features.
 - Seed photos are illustrative remote Unsplash photos; replace them with owned product photography and accurate pack information before launch.
 - Local login cookies are shared by localhost ports. Use separate browser profiles/contexts to demonstrate customer/admin/partner simultaneously.
