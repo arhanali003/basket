@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 export default async function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const response = await fetch(
-    `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/products/${encodeURIComponent(slug)}`,
+    `${process.env.API_ORIGIN ? `${process.env.API_ORIGIN}/api/v1` : process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api/v1'}/products/${encodeURIComponent(slug)}`,
     { cache: 'no-store' },
   );
   if (!response.ok) notFound();

@@ -1,5 +1,16 @@
 import type { NextConfig } from 'next';
 const config: NextConfig = {
+  // Browsers should call this site's proxy, including on new production domains.
+  ...(process.env.API_ORIGIN
+    ? {
+        env: {
+          NEXT_PUBLIC_API_URL: '/api/v1',
+          ...(process.env.VERCEL_PROJECT_PRODUCTION_URL
+            ? { NEXT_PUBLIC_SITE_URL: `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` }
+            : {}),
+        },
+      }
+    : {}),
   devIndicators: false,
   transpilePackages: ['@daybasket/ui', '@daybasket/types', '@daybasket/api-client'],
   async rewrites() {
