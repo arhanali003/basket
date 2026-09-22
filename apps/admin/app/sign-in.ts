@@ -3,7 +3,8 @@ import {
   getAuth,
   GoogleAuthProvider,
   inMemoryPersistence,
-  setPersistence,
+  initializeAuth,
+  browserPopupRedirectResolver,
   signInWithPopup,
   signOut,
 } from 'firebase/auth';
@@ -19,9 +20,12 @@ export async function signInOwner(): Promise<User> {
       'Owner sign-in is awaiting configuration. Please contact the store administrator.',
     );
   }
-  const app = getApps().length ? getApp() : initializeApp({ apiKey, authDomain, projectId });
-  const auth = getAuth(app);
-  await setPersistence(auth, inMemoryPersistence);
+  const auth = getApps().length
+    ? getAuth(getApp())
+    : initializeAuth(initializeApp({ apiKey, authDomain, projectId }), {
+        persistence: inMemoryPersistence,
+        popupRedirectResolver: browserPopupRedirectResolver,
+      });
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
   try {
