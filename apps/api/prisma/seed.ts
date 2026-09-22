@@ -215,17 +215,21 @@ async function seed() {
       create: { storeId: 'indiranagar', productId: id, available: 50 },
     });
   }
-  if (process.env.NODE_ENV !== 'production') for (const [id, name, role, phone] of [
-    ['demo-customer', 'Aarav Sharma', 'customer', '9876543210'],
-    ['demo-admin', 'Store owner', 'super_admin', '9876543211'],
-    ['demo-driver', 'Ravi Kumar', 'delivery', '9876543212'],
-  ])
-    await db.user.upsert({ where: { id }, update: {}, create: { id, name, role, phone } });
+  if (process.env.NODE_ENV !== 'production')
+    for (const [id, name, role, phone] of [
+      ['demo-customer', 'Aarav Sharma', 'customer', '9876543210'],
+      ['demo-admin', 'Store owner', 'super_admin', '9876543211'],
+      ['demo-driver', 'Ravi Kumar', 'delivery', '9876543212'],
+    ])
+      await db.user.upsert({ where: { id }, update: {}, create: { id, name, role, phone } });
   await db.coupon.upsert({
     where: { code: 'HELLO10' },
     update: {},
     create: { code: 'HELLO10', discountBps: 1000, minimum: 29900, maximum: 10000 },
   });
-  console.log('Seeded Daybasket catalogue. Development accounts:', process.env.NODE_ENV !== 'production');
+  console.log(
+    'Seeded Daybasket catalogue. Development accounts:',
+    process.env.NODE_ENV !== 'production',
+  );
 }
 seed().finally(() => db.$disconnect());

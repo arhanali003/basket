@@ -1,5 +1,25 @@
 {
-  "extends": "../../packages/config/tsconfig.json",
-  "compilerOptions": { "experimentalDecorators": true, "emitDecoratorMetadata": true },
-  "include": ["src/**/*.ts", "prisma/seed.ts"]
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "forceConsistentCasingInFileNames": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "noEmit": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
+  },
+  "include": [
+    "src/**/*.ts",
+    "prisma/seed.ts"
+  ]
 }
