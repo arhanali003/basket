@@ -1,6 +1,6 @@
 # Scope and launch status
 
-**This is a runnable local vertical slice, not the full production-ready platform described in the brief. Do not accept real customers or payments yet.** The request explicitly allows this slice first; the following list distinguishes working code from future work.
+**This is a runnable vertical slice with a hosted storefront, API and catalogue database, not the full production-ready platform described in the brief. Do not accept real customers or payments yet.** The request explicitly allows this slice first; the following list distinguishes working code from future work.
 
 ## Implemented
 
@@ -35,7 +35,7 @@ All requested analytics/comparisons, stock/customer/catalogue CSV import/export 
 
 - Original legacy files are preserved and excluded from new checks; their old endpoints are not part of Daybasket.
 - Development mock login cannot run under NODE_ENV=production. Existing mock users never become production Firebase staff automatically.
-- Production deploy templates are preparation only. No deployment, external account creation, paid service setup or real payment was performed.
+- Storefront and API are deployed on Vercel with Neon PostgreSQL; see VERCEL.md for public URLs and verified checks. Admin/delivery apps and the Redis/BullMQ worker are not hosted. Production identity and payment setup remain incomplete; no real payment was performed.
 - Maps/email/SMS/storage are not integrated. Placeholder configuration is documented, not represented as finished features.
 - Seed photos are illustrative remote Unsplash photos; replace them with owned product photography and accurate pack information before launch.
 - Local login cookies are shared by localhost ports. Use separate browser profiles/contexts to demonstrate customer/admin/partner simultaneously.

@@ -1,16 +1,22 @@
 # GitHub and Vercel deployment
 
-The storefront is deployed at https://basket-arhanquikit.vercel.app from https://github.com/arhanali003/basket. Read STATUS.md for application limitations.
+Source: https://github.com/arhanali003/basket. Read STATUS.md for application limitations.
 
-## Backend deployment in progress
+## Hosted services
 
-Create a separate Vercel project with root apps/api and the NestJS preset. Its vercel.json generates the PostgreSQL Prisma client before compiling. This does not migrate or seed a database during builds, so preview builds cannot change production data.
+- Storefront: https://basket-three-sandy.vercel.app (Vercel project `basket`, root `apps/storefront`).
+- Backend: https://basket-api-eight.vercel.app (Vercel project `basket-api`, root `apps/api`, NestJS preset).
+- Database: Neon PostgreSQL Free, connected privately to the API production environment through Vercel Marketplace.
 
-The planned database is Neon PostgreSQL through Vercel Marketplace. Installing that integration requires the account owner's acceptance of the displayed terms. Provision a free plan if available; do not select a paid plan without authorization. No database has been provisioned yet.
+The production migration and catalogue seed have run. The database contains 16 products across 8 categories; production seeding skips development accounts. API health, database readiness, catalogue loading, checkout quotes, rejected untrusted origins and unauthenticated access checks passed on 2026-09-22. Admin and delivery apps are not deployed.
 
-Before deploying the API, connect the database to that API project, configure DATABASE_URL privately, NODE_ENV=production, MOCK_PROVIDERS=false, CORS_ORIGINS=https://basket-arhanquikit.vercel.app and a strong private DELIVERY_CODE_SECRET. Run the reviewed production migration against the new database, then seed catalogue data without development staff accounts. Keep Firebase service credentials out of Git and frontend variables.
+The API build script generates the PostgreSQL Prisma client and compiles the application. Production builds also apply committed migrations; `SEED_CATALOGUE=true` runs a create-only catalogue seed. Preview builds do not migrate or seed production data. Review migrations before pushing to the production branch.
 
-After API readiness and catalogue checks pass, configure the storefront API endpoint and verify browser access. Auth still needs the production Firebase browser flow and same-origin cookie routing. Socket.IO requires distributed coordination for multiple instances; the existing polling fallback is available. The BullMQ maintenance worker still needs a separate worker host or a deliberately implemented scheduled replacement; a Vercel HTTP function does not run it continuously.
+The API uses `NODE_ENV=production`, `MOCK_PROVIDERS=false`, a private `DELIVERY_CODE_SECRET`, and the exact storefront origin in `apps/api/vercel.json`. Database credentials remain in Vercel, outside Git. Firebase service credentials have not been configured.
+
+The storefront sets `API_ORIGIN=https://basket-api-eight.vercel.app`. Its Next.js configuration proxies `/api/v1/*` to that origin, uses the relative endpoint in the browser, and derives its public site URL from Vercel's canonical production domain. Product-page server requests use the absolute API origin. Redeploy after changing build-time configuration.
+
+Production Firebase browser login and real payments still need implementation/configuration. Socket.IO and distributed coordination remain unverified; the existing polling fallback is available. The BullMQ maintenance worker still needs a separate worker host or an implemented scheduled replacement; a Vercel HTTP function does not run it continuously.
 
 ## Frontend configuration
 
@@ -26,7 +32,7 @@ Enable access to source files outside each root directory so packages/ and the w
 
 Before building, set NEXT_PUBLIC_API_URL to the hosted API HTTPS URL ending in /api/v1, NEXT_PUBLIC_SOCKET_URL to its HTTPS origin, and NEXT_PUBLIC_SITE_URL to the corresponding frontend HTTPS origin. Missing API configuration currently falls back to localhost and will not work for online visitors. Redeploy after changing these build-time variables.
 
-GitHub stores source; these frontend deployments do not provision the NestJS API, PostgreSQL database, Redis, or maintenance worker. The existing Dockerfile.api and render.yaml are backend templates, not running infrastructure. Choose and provision backend hosting before verifying catalogue, checkout, login and tracking. Existing production identity UI work in STATUS.md also remains necessary.
+GitHub stores source. The separate API project and Neon database above serve the deployed storefront. Redis and the maintenance worker remain unprovisioned; Dockerfile.api and render.yaml describe an alternative topology. Production identity UI work in STATUS.md remains necessary.
 
 Configure exact frontend origins on the API. Session cookies currently require a same-site domain arrangement; unrelated provider domains require an explicit authentication design and browser verification. Do not loosen cookie or origin protections just to make a preview work.
 

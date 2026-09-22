@@ -1,6 +1,6 @@
 # Deployment preparation
 
-Read STATUS.md before deploying: these are templates for the implemented slice, not a claim of launch readiness. No services have been provisioned.
+Read STATUS.md before deploying: these are templates for the implemented slice, not a claim of launch readiness. The storefront and API now run on Vercel with Neon PostgreSQL; see VERCEL.md for deployed URLs and limitations. The alternative Docker/Render topology below has not been provisioned.
 
 ## Local PostgreSQL/Redis
 
