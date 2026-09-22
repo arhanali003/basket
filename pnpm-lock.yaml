@@ -178,7 +178,11 @@ importers:
         specifier: workspace:*
         version: link:../../packages/ui
 
-  packages/api-client: {}
+  packages/api-client:
+    dependencies:
+      '@daybasket/types':
+        specifier: workspace:*
+        version: link:../types
 
   packages/config: {}
 
