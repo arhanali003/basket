@@ -29,6 +29,7 @@ import {
   productSchema,
 } from '../../../packages/types/src';
 import { Database } from './database';
+import { requireOwner, verifyFirebaseIdentity } from './firebase-identity';
 import { Auth, mockMode, hash, equal, sessionToken } from './auth';
 import { canTransition, distanceKm, priceCart } from './domain';
 import { notifyOrder } from './realtime';
@@ -119,10 +120,7 @@ export class ApiController {
   ) {
     if (mockMode) throw new BadRequestException('Firebase disabled in mock mode');
     const { token } = z.object({ token: z.string().max(10000) }).parse(body);
-    const { getAuth } = await import('firebase-admin/auth');
-    const { getApps, initializeApp, applicationDefault } = await import('firebase-admin/app');
-    if (!getApps().length) initializeApp({ credential: applicationDefault() });
-    const identity = await getAuth().verifyIdToken(token, true);
+    const identity = await verifyFirebaseIdentity(token);
     let user = await this.db.user.findUnique({ where: { firebaseUid: identity.uid } });
     if (!user)
       user = await this.db.user.create({
@@ -132,6 +130,26 @@ export class ApiController {
           email: identity.email,
         },
       });
+    return this.auth.signIn(user.id, res);
+  }
+  @Post('auth/owner') async owner(
+    @Body() body: unknown,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    if (mockMode) throw new BadRequestException('Use local staff login in development');
+    const { token } = z.object({ token: z.string().min(1).max(10000) }).parse(body);
+    const identity = await verifyFirebaseIdentity(token);
+    requireOwner(identity);
+    const user = await this.db.user.upsert({
+      where: { firebaseUid: identity.uid },
+      create: {
+        firebaseUid: identity.uid,
+        email: identity.email,
+        name: identity.name || 'Store owner',
+        role: 'super_admin',
+      },
+      update: { email: identity.email, role: 'super_admin' },
+    });
     return this.auth.signIn(user.id, res);
   }
   @Post('auth/staff') async loginStaff(

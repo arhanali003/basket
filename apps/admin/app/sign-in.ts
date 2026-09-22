@@ -26,7 +26,7 @@ export async function signInOwner(): Promise<User> {
   provider.setCustomParameters({ prompt: 'select_account' });
   try {
     const result = await signInWithPopup(auth, provider);
-    return await request<User>('/auth/firebase', 'POST', { token: await result.user.getIdToken() });
+    return await request<User>('/auth/owner', 'POST', { token: await result.user.getIdToken() });
   } finally {
     await signOut(auth);
   }

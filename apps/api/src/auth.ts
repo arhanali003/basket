@@ -2,6 +2,7 @@ import { Inject, Injectable, UnauthorizedException, ForbiddenException } from '@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { Request, Response } from 'express';
 import { Database } from './database';
+import { ownerEmailAllowed } from './firebase-identity';
 export const mockMode =
   process.env.MOCK_PROVIDERS === 'true' && process.env.NODE_ENV !== 'production';
 export const hash = (s: string) => createHash('sha256').update(s).digest('hex');
@@ -29,6 +30,12 @@ export class Auth {
     });
     if (!session || session.expiresAt < new Date())
       throw new UnauthorizedException('Session expired');
+    if (
+      process.env.NODE_ENV === 'production' &&
+      session.user.role === 'super_admin' &&
+      !ownerEmailAllowed(session.user.email)
+    )
+      throw new ForbiddenException('Store owner access has been removed');
     if (roles && !roles.includes(session.user.role))
       throw new ForbiddenException('This action is not allowed for your role');
     return session.user;
