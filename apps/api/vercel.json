@@ -1,6 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nestjs",
+  "env": {
+    "CORS_ORIGINS": "https://basket-three-sandy.vercel.app"
+  },
   "installCommand": "pnpm install --frozen-lockfile",
   "buildCommand": "pnpm run vercel-build"
 }
