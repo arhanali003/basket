@@ -26,6 +26,30 @@ export const checkoutSchema = z.object({
   coupon: z.string().max(30).optional(),
   idempotencyKey: z.string().uuid(),
 });
+export const imageSchema = z
+  .string()
+  .max(2048)
+  .refine(
+    (v) =>
+      /^\/api\/v1\/media\/[a-z0-9]+$/.test(v) ||
+      (() => {
+        try {
+          const url = new URL(v);
+          return url.protocol === 'https:' && !url.username && !url.password;
+        } catch {
+          return false;
+        }
+      })(),
+    'Choose an uploaded photo or an HTTPS image URL',
+  );
+export const homepageSchema = z.object({
+  hero: imageSchema.optional(),
+  breakfast: imageSchema.optional(),
+  dairy: imageSchema.optional(),
+  snacks: imageSchema.optional(),
+  pantry: imageSchema.optional(),
+});
+export type HomepageImages = z.infer<typeof homepageSchema>;
 export const productSchema = z
   .object({
     name: z.string().min(2).max(120),
@@ -33,10 +57,8 @@ export const productSchema = z
     categoryId: z.string(),
     brand: z.string().max(80),
     description: z.string().max(2000),
-    image: z
-      .string()
-      .url()
-      .refine((v) => v.startsWith('https://'), 'HTTPS image required'),
+    image: imageSchema,
+    images: z.array(imageSchema).max(8).default([]),
     unit: z.string().min(1).max(40),
     price: z.number().int().min(1).max(10000000),
     mrp: z.number().int().min(1).max(10000000),
@@ -55,6 +77,7 @@ export interface Product {
   brand: string;
   description: string;
   image: string;
+  images?: string[];
   unit: string;
   price: number;
   mrp: number;

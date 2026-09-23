@@ -616,6 +616,20 @@ export default function Admin() {
                               </button>
                               <button
                                 className="text-link"
+                                style={{ marginLeft: 14 }}
+                                disabled={busy}
+                                onClick={() =>
+                                  void mutate('/admin/products/' + p.id, 'PUT', {
+                                    ...p,
+                                    active: !p.active,
+                                    images: p.images?.length ? p.images : [p.image],
+                                  })
+                                }
+                              >
+                                {p.active ? 'Archive' : 'Restore'}
+                              </button>
+                              <button
+                                className="text-link"
                                 style={{ marginLeft: 14, color: '#a52a2a' }}
                                 disabled={busy}
                                 onClick={() => setDeleting(p)}
@@ -859,6 +873,7 @@ export default function Admin() {
               </div>
               <PhotoPicker
                 label="Product photos"
+                max={8}
                 value={editing.images || (editing.image ? [editing.image] : [])}
                 disabled={busy}
                 onBusy={setUploading}

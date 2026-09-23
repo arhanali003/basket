@@ -68,6 +68,8 @@ model Product {
   brand String
   description String
   image String
+  images Json @default("[]")
+  deletedAt DateTime?
   unit String
   price Int
   mrp Int
@@ -195,4 +197,15 @@ model AuditLog {
 model WebhookEvent {
   id String @id
   createdAt DateTime @default(now())
+}
+
+model Media {
+  id String @id @default(cuid())
+  mime String
+  data Bytes
+  createdAt DateTime @default(now())
+}
+model SiteContent {
+  id String @id
+  data Json
 }

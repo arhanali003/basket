@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import 'dotenv/config';
 import { Module, Catch, ExceptionFilter, ArgumentsHost, HttpException } from '@nestjs/common';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { NestFactory } from '@nestjs/core';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ZodError } from 'zod';
@@ -28,20 +29,18 @@ class Errors implements ExceptionFilter {
               ['P2002', 'P2034', 'P2028'].includes(error.code)
             ? 409
             : 500;
-    res
-      .status(status)
-      .json({
-        statusCode: status,
-        message:
-          error instanceof ZodError
-            ? error.issues.map((i) => i.message).join('; ')
-            : error instanceof HttpException
-              ? error.message
-              : status === 409
-                ? 'Conflict. Refresh and try again.'
-                : 'Unexpected server error',
-        requestId: res.getHeader('X-Request-ID'),
-      });
+    res.status(status).json({
+      statusCode: status,
+      message:
+        error instanceof ZodError
+          ? error.issues.map((i) => i.message).join('; ')
+          : error instanceof HttpException
+            ? error.message
+            : status === 409
+              ? 'Conflict. Refresh and try again.'
+              : 'Unexpected server error',
+      requestId: res.getHeader('X-Request-ID'),
+    });
   }
 }
 async function bootstrap() {
@@ -50,7 +49,8 @@ async function bootstrap() {
     (!process.env.DELIVERY_CODE_SECRET || process.env.MOCK_PROVIDERS === 'true')
   )
     throw new Error('Production requires real providers and DELIVERY_CODE_SECRET');
-  const app = await NestFactory.create(AppModule, { rawBody: true });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
+  app.useBodyParser('json', { limit: '2mb' });
   app.enableShutdownHooks();
   app.use(helmet());
   const origins = (

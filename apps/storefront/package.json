@@ -9,8 +9,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@daybasket/ui": "workspace:*",
+    "@daybasket/api-client": "workspace:*",
     "@daybasket/types": "workspace:*",
-    "@daybasket/api-client": "workspace:*"
+    "@daybasket/ui": "workspace:*",
+    "firebase": "12.2.1"
   }
 }

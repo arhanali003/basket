@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { money, type Product } from '@daybasket/types';
-import { Logo } from '@daybasket/ui';
+import { Logo, ProductGallery } from '@daybasket/ui';
 export const dynamic = 'force-dynamic';
 export default async function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -14,7 +14,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
     <main className="policies">
       <Logo />
       <div className="product-detail" style={{ marginTop: 40 }}>
-        <img src={p.image} alt={p.name} />
+        <ProductGallery image={p.image} images={p.images} name={p.name} />
         <div>
           <span className="eyebrow">{p.brand}</span>
           <h1 style={{ fontSize: 32 }}>{p.name}</h1>

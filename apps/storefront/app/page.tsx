@@ -23,7 +23,7 @@ import {
   Grid2X2,
 } from 'lucide-react';
 import { io } from 'socket.io-client';
- import { signInCustomer, signInError } from './sign-in';
+import { signInCustomer, signInError } from './sign-in';
 import { api, request } from '@daybasket/api-client';
 import {
   money,
@@ -58,11 +58,7 @@ export default function Storefront() {
     [toast, setToast] = useState(''),
     [busy, setBusy] = useState(false),
     [formError, setFormError] = useState('');
-  const [phone, setPhone] = useState(''),
-    [name, setName] = useState(''),
-    [challenge, setChallenge] = useState(''),
-    [code, setCode] = useState(''),
-    [resend, setResend] = useState(0);
+  const [name, setName] = useState('');
   const [address, setAddress] = useState<Address | null>(null),
     [geo, setGeo] = useState({ latitude: 12.9784, longitude: 77.6408 }),
     [geoLabel, setGeoLabel] = useState('Development pin: Indiranagar store area'),
@@ -74,10 +70,6 @@ export default function Storefront() {
     [tracking, setTracking] = useState<(Order & { deliveryCode?: string }) | null>(null),
     [live, setLive] = useState(false);
   const [homepage, setHomepage] = useState<HomepageImages>({});
-  const [mockLogin, setMockLogin] = useState(false);
-  const [authReady, setAuthReady] = useState(false);
-  const phoneConfirmation = useRef<ConfirmationResult | null>(null);
-  const captchaContainer = useRef<HTMLDivElement>(null);
   const initialized = useRef(false),
     toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null),
     checkoutKey = useRef<string | null>(null),
@@ -109,12 +101,6 @@ export default function Storefront() {
     request<HomepageImages>('/homepage')
       .then(setHomepage)
       .catch(() => {});
-    request<{ mockProviders: boolean }>('/config')
-      .then((config) => {
-        setMockLogin(config.mockProviders);
-        setAuthReady(true);
-      })
-      .catch(() => setAuthReady(true));
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
     try {
       const c = JSON.parse(localStorage.getItem('daybasket-cart') || '[]') as CartLine[];
@@ -148,11 +134,6 @@ export default function Storefront() {
   useEffect(() => {
     localStorage.setItem('daybasket-wishlist', JSON.stringify(saved));
   }, [saved]);
-  useEffect(() => {
-    if (!resend) return;
-    const t = setTimeout(() => setResend(resend - 1), 1000);
-    return () => clearTimeout(t);
-  }, [resend]);
   useEffect(() => {
     if (panel !== 'cart' || !cart.length) {
       setQuote(null);
@@ -246,48 +227,6 @@ export default function Storefront() {
   if (sort === 'low') visible = [...visible].sort((a, b) => a.price - b.price);
   if (sort === 'discount')
     visible = [...visible].sort((a, b) => 1 - b.price / b.mrp - (1 - a.price / a.mrp));
-  async function sendCode() {
-    setBusy(true);
-    setFormError('');
-    try {
-      if (!/^[6-9]\d{9}$/.test(phone))
-        throw new Error('Enter a valid 10-digit Indian mobile number.');
-      if (mockLogin) {
-        const result = await request<{ challenge: string }>('/auth/otp', 'POST', { phone });
-        setChallenge(result.challenge);
-      } else {
-        if (!captchaContainer.current) throw new Error('Please reopen sign-in and try again.');
-        phoneConfirmation.current = await sendPhoneCode(phone, captchaContainer.current);
-        setChallenge('firebase');
-      }
-      setCode('');
-      setResend(60);
-    } catch (e) {
-      setFormError(signInError(e));
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function verify() {
-    setBusy(true);
-    setFormError('');
-    try {
-      const u = !mockLogin
-        ? await verifyPhoneCode(phoneConfirmation.current!, code)
-        : await request<User>('/auth/verify', 'POST', {
-            challenge,
-            code,
-            name: name || 'Neighbour',
-          });
-      setChallenge('');
-      phoneConfirmation.current = null;
-      await finishSignIn(u);
-    } catch (e) {
-      setFormError(signInError(e));
-    } finally {
-      setBusy(false);
-    }
-  }
   async function finishSignIn(u: User) {
     setUser(u);
     const [addresses, remote] = await Promise.all([api.addresses(), request<CartLine[]>('/cart')]);
@@ -306,7 +245,9 @@ export default function Storefront() {
     setBusy(true);
     setFormError('');
     try {
-      const u = await signInCustomer();
+      if (name.trim().length < 2)
+        throw new Error('Please enter your name (at least 2 characters).');
+      const u = await signInCustomer(name.trim());
       await finishSignIn(u);
     } catch (e) {
       setFormError(signInError(e));
@@ -826,64 +767,35 @@ export default function Storefront() {
           Account
         </button>
       </nav>
-      <Modal
-        open={panel === 'login'}
-        onClose={() => setPanel(null)}
-        title={challenge ? 'A little code. A warm welcome.' : 'Hello, neighbour.'}
-      >
+      <Modal open={panel === 'login'} onClose={() => setPanel(null)} title="Hello, neighbour.">
         <p className="address-hint">
-          Sign in to save your basket and get everyday goodness delivered.
+          Enter your name and continue with Google to save your basket and place orders.
         </p>
-         <button
-  className="primary full"
-  disabled={busy || !authReady}
-  onClick={googleLogin}
->
-  Continue with Google / Gmail <ArrowRight size={15} />
-</button>
-        
-        {formError && <ErrorNotice message={formError} />}
-        <button
-          className="primary full"
-          disabled={
-            busy || !authReady || phone.length !== 10 || (!!challenge && !/^\d{6}$/.test(code))
-          }
-          onClick={challenge ? verify : sendCode}
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            void googleLogin();
+          }}
         >
-          {busy ? 'One moment…' : challenge ? 'Verify & continue' : 'Send verification code'}
-          <ArrowRight size={15} />
-        </button>
-        {challenge && (
-          <button
-            className="text-link"
-            style={{ marginTop: 17 }}
-            disabled={resend > 0 || busy}
-            onClick={sendCode}
-          >
-            {resend ? `Resend in ${resend}s` : 'Resend code'}
+          <label className="field">
+            Your name
+            <input
+              name="name"
+              autoComplete="name"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              minLength={2}
+              maxLength={80}
+              required
+              disabled={busy}
+              placeholder="Enter your full name"
+            />
+          </label>
+          {formError && <ErrorNotice message={formError} />}
+          <button className="primary full" type="submit" disabled={busy || name.trim().length < 2}>
+            {busy ? 'Signing in…' : 'Continue with Google'} <ArrowRight size={15} />
           </button>
-        )}
-        {challenge && (
-          <button
-            className="text-link"
-            disabled={busy}
-            style={{ marginLeft: 16 }}
-            onClick={() => {
-              setChallenge('');
-              setCode('');
-              phoneConfirmation.current = null;
-              setFormError('');
-            }}
-          >
-            Change number
-          </button>
-        )}
-        {!mockLogin && (
-          <p className="address-hint">
-            By requesting a code, you agree to receive a verification SMS. Google processes your
-            phone number for spam and abuse prevention. SMS charges may apply.
-          </p>
-        )}
+        </form>
       </Modal>
       <Modal
         open={panel === 'location'}

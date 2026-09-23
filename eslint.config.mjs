@@ -3,6 +3,7 @@ import ts from 'typescript-eslint';
 export default ts.config(
   { ignores: ['**/.next/**', '**/dist/**', '**/node_modules/**', '**/next-env.d.ts'] },
   js.configs.recommended,
+  { files: ['apps/api/scripts/*.mjs'], languageOptions: { globals: { process: 'readonly' } } },
   ...ts.configs.recommended,
   { files: ['**/public/sw.js'], languageOptions: { globals: { self: 'readonly' } } },
   {

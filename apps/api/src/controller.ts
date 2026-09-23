@@ -27,6 +27,7 @@ import {
   cartSchema,
   checkoutSchema,
   productSchema,
+  homepageSchema,
 } from '../../../packages/types/src';
 import { Database } from './database';
 import { requireOwner, verifyFirebaseIdentity } from './firebase-identity';
@@ -118,18 +119,20 @@ export class ApiController {
     @Body() body: unknown,
     @Res({ passthrough: true }) res: Response,
   ) {
-    if (mockMode) throw new BadRequestException('Firebase disabled in mock mode');
-    const { token } = z.object({ token: z.string().max(10000) }).parse(body);
+    const { token, name } = z
+      .object({
+        token: z.string().min(1).max(10000),
+        name: z.string().trim().min(2).max(80),
+      })
+      .parse(body);
     const identity = await verifyFirebaseIdentity(token);
-    let user = await this.db.user.findUnique({ where: { firebaseUid: identity.uid } });
-    if (!user)
-      user = await this.db.user.create({
-        data: {
-          firebaseUid: identity.uid,
-          name: identity.name || 'Neighbour',
-          email: identity.email,
-        },
-      });
+    if (identity.firebase.sign_in_provider !== 'google.com' || !identity.email_verified)
+      throw new BadRequestException('Please sign in with a verified Google account.');
+    const user = await this.db.user.upsert({
+      where: { firebaseUid: identity.uid },
+      create: { firebaseUid: identity.uid, name, email: identity.email },
+      update: { name },
+    });
     return this.auth.signIn(user.id, res);
   }
   @Post('auth/owner') async owner(
@@ -188,6 +191,7 @@ export class ApiController {
       products: await this.db.product.findMany({
         where: {
           active: true,
+          deletedAt: null,
           ...(category ? { categoryId: category } : {}),
           ...(q
             ? {
@@ -207,7 +211,7 @@ export class ApiController {
   }
   @Get('products/:id') async product(@Param('id') id: string) {
     const product = await this.db.product.findFirst({
-      where: { OR: [{ id }, { slug: id }], active: true },
+      where: { OR: [{ id }, { slug: id }], active: true, deletedAt: null },
       include: { inventory: true },
     });
     if (!product) throw new NotFoundException('Product not found');
@@ -277,7 +281,7 @@ export class ApiController {
     couponCode?: string,
   ) {
     const products = await tx.product.findMany({
-      where: { id: { in: items.map((i) => i.productId) }, active: true },
+      where: { id: { in: items.map((i) => i.productId) }, active: true, deletedAt: null },
     });
     const lines = items.map((i) => {
       const p = products.find((p) => p.id === i.productId);
@@ -469,9 +473,70 @@ export class ApiController {
     notifyOrder(id);
     return { ok: true };
   }
+  @Get('homepage') async homepage() {
+    return (await this.db.siteContent.findUnique({ where: { id: 'homepage' } }))?.data ?? {};
+  }
+  @Put('admin/homepage') async saveHomepage(@Req() req: Request, @Body() body: unknown) {
+    const u = await this.auth.user(req, staff);
+    const data = homepageSchema.parse(body);
+    return this.db.$transaction(async (tx) => {
+      await tx.siteContent.upsert({
+        where: { id: 'homepage' },
+        create: { id: 'homepage', data },
+        update: { data },
+      });
+      await tx.auditLog.create({
+        data: { actorId: u.id, action: 'edit_homepage', entityId: 'homepage' },
+      });
+      return data;
+    });
+  }
+  @Post('admin/media') async uploadMedia(@Req() req: Request, @Body() body: unknown) {
+    await this.auth.user(req, staff);
+    const { data } = z.object({ data: z.string().max(1400000) }).parse(body);
+    const match = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/]+={0,2})$/.exec(data);
+    if (!match) throw new BadRequestException('Upload a JPEG, PNG or WebP photo');
+    const bytes = Buffer.from(match[2], 'base64');
+    const valid =
+      match[1] === 'image/jpeg'
+        ? bytes.subarray(0, 3).equals(Buffer.from([255, 216, 255]))
+        : match[1] === 'image/png'
+          ? bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
+          : bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WEBP';
+    if (!valid || bytes.length > 1024 * 1024)
+      throw new BadRequestException('Invalid photo or photo exceeds 1 MB');
+    const media = await this.db.media.create({
+      data: { mime: match[1], data: bytes },
+      select: { id: true },
+    });
+    return { url: `/api/v1/media/${media.id}` };
+  }
+  @Get('media/:id') async media(@Param('id') id: string, @Res() res: Response) {
+    const media = await this.db.media.findUnique({ where: { id } });
+    if (!media) throw new NotFoundException('Photo not found');
+    res.setHeader('Content-Type', media.mime);
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.send(Buffer.from(media.data));
+  }
+  @Delete('admin/products/:id') async deleteProduct(@Req() req: Request, @Param('id') id: string) {
+    const u = await this.auth.user(req, staff);
+    return this.db.$transaction(async (tx) => {
+      const result = await tx.product.updateMany({
+        where: { id, deletedAt: null },
+        data: { active: false, deletedAt: new Date() },
+      });
+      if (!result.count) throw new NotFoundException('Product not found');
+      await tx.cartItem.deleteMany({ where: { productId: id } });
+      await tx.wishlist.deleteMany({ where: { productId: id } });
+      await tx.auditLog.create({ data: { actorId: u.id, action: 'delete_product', entityId: id } });
+      return { ok: true };
+    });
+  }
   @Get('admin/products') async adminProducts(@Req() req: Request) {
     await this.auth.user(req, staff);
     return this.db.product.findMany({
+      where: { deletedAt: null },
       include: { inventory: true },
       orderBy: { createdAt: 'asc' },
     });
@@ -497,7 +562,7 @@ export class ApiController {
     const u = await this.auth.user(req, staff);
     const data = productSchema.parse(body);
     return this.db.$transaction(async (tx) => {
-      const p = await tx.product.update({ where: { id }, data });
+      const p = await tx.product.update({ where: { id, deletedAt: null }, data });
       await tx.auditLog.create({ data: { actorId: u.id, action: 'edit_product', entityId: id } });
       return p;
     });
