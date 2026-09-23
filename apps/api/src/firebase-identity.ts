@@ -6,15 +6,39 @@ import {
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth, type DecodedIdToken } from 'firebase-admin/auth';
 
-export function ownerEmailAllowed(email?: string | null): boolean {
+function emailListed(email: string | null | undefined, list: string | undefined): boolean {
   return (
     !!email &&
-    (process.env.ADMIN_EMAILS || '')
+    (list || '')
       .split(',')
       .map((value) => value.trim().toLowerCase())
       .filter(Boolean)
       .includes(email.trim().toLowerCase())
   );
+}
+
+export function ownerEmailAllowed(email?: string | null): boolean {
+  return emailListed(email, process.env.ADMIN_EMAILS);
+}
+
+export function staffRole(email?: string | null): 'super_admin' | 'staff' | null {
+  if (ownerEmailAllowed(email)) return 'super_admin';
+  return emailListed(email, process.env.STAFF_EMAILS) ? 'staff' : null;
+}
+
+export function requireStaff(identity: DecodedIdToken): 'super_admin' | 'staff' {
+  if (identity.firebase.sign_in_provider !== 'google.com')
+    throw new ForbiddenException('Please sign in with Google.');
+  if (!identity.email_verified)
+    throw new ForbiddenException(
+      'Google has not verified this email address. Verify it in your Google account, then sign in again.',
+    );
+  const role = staffRole(identity.email);
+  if (!role)
+    throw new ForbiddenException(
+      'This Google account does not have store access. Ask the owner to add your exact Google email to the owner or employee access list.',
+    );
+  return role;
 }
 
 // Customer accounts need a valid Google identity, not the owner's verified-email policy.

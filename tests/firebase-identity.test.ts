@@ -4,6 +4,8 @@ import {
   ownerEmailAllowed,
   requireOwner,
   requireCustomer,
+  requireStaff,
+  staffRole,
   verifyFirebaseIdentity,
 } from '../apps/api/src/firebase-identity';
 
@@ -21,6 +23,7 @@ const originalFetch = global.fetch;
 const previous = { ...process.env };
 beforeEach(() => {
   process.env.ADMIN_EMAILS = 'owner@example.com, second@example.com';
+  process.env.STAFF_EMAILS = 'employee@example.com';
   process.env.FIREBASE_PROJECT_ID = 'test-project';
   process.env.FIREBASE_WEB_API_KEY = 'public-test-key';
   (getAuth as jest.Mock).mockReturnValue({ verifyIdToken: verify });
@@ -140,4 +143,24 @@ test('valid Google accounts without email verification pass account validation',
   });
   const verified = await verifyFirebaseIdentity('valid-google-token');
   expect(() => requireCustomer(verified)).not.toThrow();
+});
+
+test('approved employees get staff access and owners retain owner access', () => {
+  expect(requireStaff(identity)).toBe('super_admin');
+  const employee = { ...identity, email: 'EMPLOYEE@example.com' };
+  expect(requireStaff(employee)).toBe('staff');
+  expect(() => requireOwner(employee)).toThrow();
+  expect(() => requireStaff({ ...employee, email_verified: false })).toThrow('verified');
+  expect(() => requireStaff({ ...identity, email: 'employee@example.com.evil' })).toThrow('access');
+  expect(() =>
+    requireStaff({ ...employee, firebase: { ...identity.firebase, sign_in_provider: 'password' } }),
+  ).toThrow();
+});
+test('access lists support multiple emails and removal immediately changes role eligibility', () => {
+  process.env.STAFF_EMAILS = 'employee@example.com, other@example.com, owner@example.com';
+  expect(staffRole('other@example.com')).toBe('staff');
+  expect(staffRole('owner@example.com')).toBe('super_admin');
+  process.env.STAFF_EMAILS = '';
+  expect(staffRole('employee@example.com')).toBeNull();
+  expect(staffRole(undefined)).toBeNull();
 });

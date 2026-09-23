@@ -20,7 +20,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import { PhotoPicker } from './photo-picker';
-import { signInOwner } from './sign-in';
+import { signInOwner, prepareAdminAuth, adminSignInError } from './sign-in';
 import { api, request } from '@daybasket/api-client';
 import {
   type Product,
@@ -66,6 +66,15 @@ export default function Admin() {
   const [homepage, setHomepage] = useState<HomepageImages>({});
   const [deleting, setDeleting] = useState<Product | null>(null);
   useEffect(() => {
+    if (process.env.NODE_ENV === 'production') {
+      try {
+        prepareAdminAuth();
+      } catch (error) {
+        setError(adminSignInError(error));
+      }
+    }
+  }, []);
+  useEffect(() => {
     if (user && tab === 'homepage')
       request<HomepageImages>('/homepage')
         .then(setHomepage)
@@ -97,7 +106,7 @@ export default function Admin() {
     api
       .me()
       .then((u) => {
-        if (u.role === 'super_admin') {
+        if (['super_admin', 'staff'].includes(u.role)) {
           setUser(u);
           void refresh();
         }
@@ -119,14 +128,14 @@ export default function Admin() {
         process.env.NODE_ENV === 'production'
           ? await signInOwner()
           : await request<User>('/auth/staff', 'POST', { role: 'super_admin', password });
-      if (u.role !== 'super_admin') {
+      if (!['super_admin', 'staff'].includes(u.role)) {
         await request('/auth/logout', 'POST', {});
-        throw new Error('This account does not have store owner access.');
+        throw new Error('This account does not have store access.');
       }
       setUser(u);
       await refresh();
     } catch (e) {
-      setError((e as Error).message);
+      setError(adminSignInError(e));
     } finally {
       setBusy(false);
     }
@@ -313,7 +322,9 @@ export default function Admin() {
                   : 'Open store studio'}{' '}
               <ArrowRight size={15} />
             </button>
-            <p style={{ marginTop: 24, fontSize: 10 }}>Restricted to authorized store staff.</p>
+            <p style={{ marginTop: 24, fontSize: 10 }}>
+              Owners and approved employees only. Use the Google email your owner has approved.
+            </p>
           </form>
         </div>
       </div>

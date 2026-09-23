@@ -30,7 +30,7 @@ import {
   homepageSchema,
 } from '../../../packages/types/src';
 import { Database } from './database';
-import { requireCustomer, requireOwner, verifyFirebaseIdentity } from './firebase-identity';
+import { requireCustomer, requireStaff, verifyFirebaseIdentity } from './firebase-identity';
 import { Auth, mockMode, hash, equal, sessionToken } from './auth';
 import { canTransition, distanceKm, priceCart } from './domain';
 import { notifyOrder } from './realtime';
@@ -40,7 +40,7 @@ const includeOrder = {
   locations: { orderBy: { createdAt: 'desc' as const }, take: 1 },
 };
 const challenges = new Map<string, { phone: string; expires: number; attempts: number }>();
-const staff = ['super_admin'];
+const staff = ['super_admin', 'staff'];
 const deliveryCode = (id: string) =>
   String(
     (parseInt(
@@ -132,7 +132,10 @@ export class ApiController {
       create: { firebaseUid: identity.uid, name, email: identity.email },
       update: { name },
     });
-    if (user.role === 'super_admin') requireOwner(identity);
+    if (staff.includes(user.role) && requireStaff(identity) !== user.role)
+      throw new ForbiddenException(
+        'Your store role changed. Sign in through the admin page again.',
+      );
     return this.auth.signIn(user.id, res);
   }
   @Post('auth/owner') async owner(
@@ -142,16 +145,16 @@ export class ApiController {
     if (mockMode) throw new BadRequestException('Use local staff login in development');
     const { token } = z.object({ token: z.string().min(1).max(10000) }).parse(body);
     const identity = await verifyFirebaseIdentity(token);
-    requireOwner(identity);
+    const role = requireStaff(identity);
     const user = await this.db.user.upsert({
       where: { firebaseUid: identity.uid },
       create: {
         firebaseUid: identity.uid,
         email: identity.email,
-        name: identity.name || 'Store owner',
-        role: 'super_admin',
+        name: identity.name || 'Store team',
+        role,
       },
-      update: { email: identity.email, role: 'super_admin' },
+      update: { email: identity.email, role },
     });
     return this.auth.signIn(user.id, res);
   }
@@ -418,12 +421,11 @@ export class ApiController {
   @Get('orders') async orders(@Req() req: Request) {
     const u = await this.auth.user(req);
     const orders = await this.db.order.findMany({
-      where:
-        u.role === 'super_admin'
-          ? {}
-          : u.role === 'delivery'
-            ? { driverId: u.id }
-            : { userId: u.id },
+      where: staff.includes(u.role)
+        ? {}
+        : u.role === 'delivery'
+          ? { driverId: u.id }
+          : { userId: u.id },
       include: includeOrder,
       orderBy: { createdAt: 'desc' },
       take: 100,
@@ -433,7 +435,7 @@ export class ApiController {
   @Get('orders/:id') async order(@Req() req: Request, @Param('id') id: string) {
     const u = await this.auth.user(req);
     const o = await this.db.order.findUnique({ where: { id }, include: includeOrder });
-    if (!o || !(o.userId === u.id || o.driverId === u.id || u.role === 'super_admin'))
+    if (!o || !(o.userId === u.id || o.driverId === u.id || staff.includes(u.role)))
       throw new NotFoundException('Order not found');
     return this.publicOrder(o, u);
   }
@@ -441,7 +443,7 @@ export class ApiController {
     const u = await this.auth.user(req);
     await this.db.$transaction(async (tx) => {
       const o = await tx.order.findUnique({ where: { id }, include: { items: true } });
-      if (!o || !(o.userId === u.id || u.role === 'super_admin')) throw new NotFoundException();
+      if (!o || !(o.userId === u.id || staff.includes(u.role))) throw new NotFoundException();
       if (!canTransition(o.status, 'cancelled'))
         throw new ConflictException('This order can no longer be cancelled');
       const changed = await tx.order.updateMany({
@@ -609,7 +611,7 @@ export class ApiController {
     @Param('id') id: string,
     @Body() body: unknown,
   ) {
-    const u = await this.auth.user(req, ['super_admin', 'delivery']);
+    const u = await this.auth.user(req, ['super_admin', 'staff', 'delivery']);
     const { status, code } = z
       .object({ status: z.string(), code: z.string().optional() })
       .parse(body);

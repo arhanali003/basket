@@ -30,7 +30,11 @@ export function initializeTracking(
         const order = await db.order.findUnique({ where: { id } });
         if (
           !order ||
-          !(order.userId === user.id || order.driverId === user.id || user.role === 'super_admin')
+          !(
+            order.userId === user.id ||
+            order.driverId === user.id ||
+            ['super_admin', 'staff'].includes(user.role)
+          )
         )
           return ack?.({ ok: false });
         await socket.join(id);
