@@ -19,6 +19,9 @@ jest.mock(
     browserSessionPersistence: 'session',
     browserPopupRedirectResolver: 'resolver',
     GoogleAuthProvider: class {
+      static credentialFromResult() {
+        return { accessToken: 'google-token' };
+      }
       setCustomParameters() {}
       addScope() {}
     },
@@ -78,17 +81,32 @@ test('uses the admin origin and session persistence for the redirect', async () 
   expect(memory.get('daybasket-owner-sign-in')).toBe('1');
 });
 test('exchanges a returned Google credential once even with repeated startup calls', async () => {
-  mockResult.mockResolvedValue({ user: { reload: jest.fn().mockResolvedValue(undefined), emailVerified: true, getIdToken: jest.fn().mockResolvedValue('verified-token') } });
+  mockResult.mockResolvedValue({
+    user: {
+      reload: jest.fn().mockResolvedValue(undefined),
+      emailVerified: true,
+      getIdToken: jest.fn().mockResolvedValue('verified-token'),
+    },
+  });
   mockRequest.mockResolvedValue({ id: 'owner', role: 'super_admin' });
   const { finishOwnerSignIn } = await import('../apps/admin/app/sign-in');
   const results = await Promise.all([finishOwnerSignIn(), finishOwnerSignIn()]);
   expect(results[0]).toEqual({ id: 'owner', role: 'super_admin' });
   expect(mockRequest).toHaveBeenCalledTimes(1);
-  expect(mockRequest).toHaveBeenCalledWith('/auth/owner', 'POST', { token: 'verified-token' });
+  expect(mockRequest).toHaveBeenCalledWith('/auth/owner', 'POST', {
+    token: 'verified-token',
+    googleAccessToken: 'google-token',
+  });
   expect(mockSignOut).toHaveBeenCalledTimes(1);
 });
 test('keeps backend access rejection visible and clears temporary identity', async () => {
-  mockResult.mockResolvedValue({ user: { reload: jest.fn().mockResolvedValue(undefined), emailVerified: true, getIdToken: jest.fn().mockResolvedValue('token') } });
+  mockResult.mockResolvedValue({
+    user: {
+      reload: jest.fn().mockResolvedValue(undefined),
+      emailVerified: true,
+      getIdToken: jest.fn().mockResolvedValue('token'),
+    },
+  });
   mockRequest.mockRejectedValue(new Error('This account does not have store access'));
   const { finishOwnerSignIn } = await import('../apps/admin/app/sign-in');
   await expect(finishOwnerSignIn()).rejects.toThrow('store access');
@@ -115,15 +133,19 @@ test('blocked session storage is reported before leaving the page', async () => 
   expect(mockRedirect).not.toHaveBeenCalled();
 });
 
-test('sends verification for an unverified account without creating an admin session', async () => {
-  const user = { reload: jest.fn().mockResolvedValue(undefined), emailVerified: false, getIdToken: jest.fn().mockResolvedValue('fresh-token') };
+test('passes Google proof to the backend when Firebase has no primary email', async () => {
+  const user = {
+    email: null,
+    emailVerified: false,
+    getIdToken: jest.fn().mockResolvedValue('token'),
+  };
   mockResult.mockResolvedValue({ user });
-  mockVerification.mockResolvedValue(undefined);
+  mockRequest.mockResolvedValue({ id: 'owner', role: 'super_admin' });
   const { finishOwnerSignIn } = await import('../apps/admin/app/sign-in');
-  await expect(finishOwnerSignIn()).rejects.toThrow('verification link has been sent');
-  expect(user.reload).toHaveBeenCalledTimes(1);
-  expect(user.getIdToken).toHaveBeenCalledWith(true);
-  expect(mockVerification).toHaveBeenCalledWith(user);
-  expect(mockRequest).not.toHaveBeenCalled();
-  expect(mockSignOut).toHaveBeenCalledTimes(1);
+  await expect(finishOwnerSignIn()).resolves.toEqual({ id: 'owner', role: 'super_admin' });
+  expect(mockRequest).toHaveBeenCalledWith('/auth/owner', 'POST', {
+    token: 'token',
+    googleAccessToken: 'google-token',
+  });
+  expect(mockVerification).not.toHaveBeenCalled();
 });

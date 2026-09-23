@@ -30,7 +30,12 @@ import {
   homepageSchema,
 } from '../../../packages/types/src';
 import { Database } from './database';
-import { requireCustomer, requireStaff, verifyFirebaseIdentity } from './firebase-identity';
+import {
+  requireCustomer,
+  requireStaff,
+  verifyFirebaseIdentity,
+  resolveGoogleEmail,
+} from './firebase-identity';
 import { Auth, mockMode, hash, equal, sessionToken } from './auth';
 import { canTransition, distanceKm, priceCart } from './domain';
 import { notifyOrder } from './realtime';
@@ -143,8 +148,16 @@ export class ApiController {
     @Res({ passthrough: true }) res: Response,
   ) {
     if (mockMode) throw new BadRequestException('Use local staff login in development');
-    const { token } = z.object({ token: z.string().min(1).max(10000) }).parse(body);
-    const identity = await verifyFirebaseIdentity(token);
+    const { token, googleAccessToken } = z
+      .object({
+        token: z.string().min(1).max(10000),
+        googleAccessToken: z.string().min(1).max(10000).optional(),
+      })
+      .parse(body);
+    const identity = await resolveGoogleEmail(
+      await verifyFirebaseIdentity(token),
+      googleAccessToken,
+    );
     const role = requireStaff(identity);
     const user = await this.db.user.upsert({
       where: { firebaseUid: identity.uid },

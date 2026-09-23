@@ -4,6 +4,7 @@ import {
   ownerEmailAllowed,
   requireOwner,
   requireCustomer,
+  resolveGoogleEmail,
   requireStaff,
   staffRole,
   verifyFirebaseIdentity,
@@ -163,4 +164,39 @@ test('access lists support multiple emails and removal immediately changes role 
   process.env.STAFF_EMAILS = '';
   expect(staffRole('employee@example.com')).toBeNull();
   expect(staffRole(undefined)).toBeNull();
+});
+
+const missingEmailIdentity = {
+  ...identity,
+  email: undefined,
+  email_verified: false,
+  firebase: { ...identity.firebase, identities: { 'google.com': ['google-subject'] } },
+} as DecodedIdToken;
+test('resolves a verified Google email for multiple-account Firebase users', async () => {
+  (global.fetch as jest.Mock).mockResolvedValue({
+    ok: true,
+    json: async () => ({ sub: 'google-subject', email: 'owner@example.com', email_verified: true }),
+  });
+  const resolved = await resolveGoogleEmail(missingEmailIdentity, 'access');
+  expect(requireStaff(resolved)).toBe('super_admin');
+});
+test.each([
+  { sub: 'attacker', email: 'owner@example.com', email_verified: true },
+  { sub: 'google-subject', email: 'owner@example.com', email_verified: false },
+  { sub: 'google-subject', email_verified: true },
+])('rejects mismatched or unverified Google proof %j', async (profile) => {
+  (global.fetch as jest.Mock).mockResolvedValue({ ok: true, json: async () => profile });
+  await expect(resolveGoogleEmail(missingEmailIdentity, 'access')).rejects.toThrow();
+});
+test('Google email fallback does not bypass owner allowlist', async () => {
+  (global.fetch as jest.Mock).mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      sub: 'google-subject',
+      email: 'outsider@example.com',
+      email_verified: true,
+    }),
+  });
+  const resolved = await resolveGoogleEmail(missingEmailIdentity, 'access');
+  expect(() => requireStaff(resolved)).toThrow('access');
 });

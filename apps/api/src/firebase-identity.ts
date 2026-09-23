@@ -115,3 +115,49 @@ export async function verifyFirebaseIdentity(token: string): Promise<DecodedIdTo
   }
   return identity;
 }
+
+// Multiple-accounts mode omits Firebase's primary email. Obtain it directly
+// from Google and bind it to the Google subject in the verified Firebase token.
+export async function resolveGoogleEmail(
+  identity: DecodedIdToken,
+  accessToken?: string,
+): Promise<DecodedIdToken> {
+  if (identity.email && identity.email_verified) return identity;
+  const subjects = identity.firebase.identities?.['google.com'];
+  if (identity.firebase.sign_in_provider !== 'google.com' || !subjects?.length || !accessToken)
+    throw new UnauthorizedException('Please sign in with Google again to share your email.');
+  let response: Response;
+  try {
+    response = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      signal: AbortSignal.timeout(10000),
+    });
+  } catch {
+    throw new ServiceUnavailableException(
+      'Google sign-in is temporarily unavailable. Please try again.',
+    );
+  }
+  if (response.status >= 500 || response.status === 429)
+    throw new ServiceUnavailableException(
+      'Google sign-in is temporarily unavailable. Please try again.',
+    );
+  if (!response.ok)
+    throw new UnauthorizedException('Google sign-in expired. Please sign in again.');
+  const profile = (await response.json()) as {
+    sub?: string;
+    email?: string;
+    email_verified?: boolean;
+  };
+  if (
+    !profile.sub ||
+    !subjects.includes(profile.sub) ||
+    typeof profile.email !== 'string' ||
+    !profile.email ||
+    profile.email_verified !== true ||
+    (identity.email && identity.email.toLowerCase() !== profile.email.toLowerCase())
+  )
+    throw new UnauthorizedException(
+      'Google account identity does not match. Please sign in again.',
+    );
+  return { ...identity, email: profile.email, email_verified: true };
+}
