@@ -20,7 +20,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import { PhotoPicker } from './photo-picker';
-import { signInOwner, prepareAdminAuth, adminSignInError } from './sign-in';
+import { signInOwner, finishOwnerSignIn, adminSignInError } from './sign-in';
 import { api, request } from '@daybasket/api-client';
 import {
   type Product,
@@ -66,15 +66,6 @@ export default function Admin() {
   const [homepage, setHomepage] = useState<HomepageImages>({});
   const [deleting, setDeleting] = useState<Product | null>(null);
   useEffect(() => {
-    if (process.env.NODE_ENV === 'production') {
-      try {
-        prepareAdminAuth();
-      } catch (error) {
-        setError(adminSignInError(error));
-      }
-    }
-  }, []);
-  useEffect(() => {
     if (user && tab === 'homepage')
       request<HomepageImages>('/homepage')
         .then(setHomepage)
@@ -103,15 +94,18 @@ export default function Admin() {
     }
   }
   useEffect(() => {
-    api
-      .me()
+    const restoreSession = async () => {
+      const redirected = process.env.NODE_ENV === 'production' ? await finishOwnerSignIn() : null;
+      return redirected ?? (await api.me().catch(() => null));
+    };
+    restoreSession()
       .then((u) => {
-        if (['super_admin', 'staff'].includes(u.role)) {
+        if (u && ['super_admin', 'staff'].includes(u.role)) {
           setUser(u);
           void refresh();
         }
       })
-      .catch(() => {})
+      .catch((error) => setError(adminSignInError(error)))
       .finally(() => setReady(true));
   }, []);
   useEffect(() => {
@@ -293,7 +287,10 @@ export default function Admin() {
           <form className="login-form" onSubmit={login}>
             <span className="eyebrow">WELCOME BACK</span>
             <h2 style={{ marginTop: 15 }}>Your store, at a glance.</h2>
-            <p>Sign in to manage your products, orders and deliveries.</p>
+            <p>
+              Sign in to manage your products, orders and deliveries. Google sign-in opens in this
+              tab.
+            </p>
             {process.env.NODE_ENV !== 'production' && (
               <>
                 <div className="demo-note">

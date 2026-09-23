@@ -2,10 +2,11 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import {
   getAuth,
   GoogleAuthProvider,
-  inMemoryPersistence,
+  browserSessionPersistence,
   initializeAuth,
   browserPopupRedirectResolver,
-  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signOut,
 } from 'firebase/auth';
 import { request } from '@daybasket/api-client';
@@ -13,7 +14,8 @@ import type { User } from '@daybasket/types';
 
 export function prepareAdminAuth() {
   const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-  const authDomain = process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN;
+  // Serve Firebase's helper from this origin so browser storage is first-party.
+  const authDomain = window.location.host;
   const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
   if (!apiKey || !authDomain || !projectId) {
     throw new Error(
@@ -23,7 +25,7 @@ export function prepareAdminAuth() {
   const auth = getApps().length
     ? getAuth(getApp())
     : initializeAuth(initializeApp({ apiKey, authDomain, projectId }), {
-        persistence: inMemoryPersistence,
+        persistence: browserSessionPersistence,
         popupRedirectResolver: browserPopupRedirectResolver,
       });
   return auth;
@@ -51,14 +53,48 @@ export function adminSignInError(error: unknown): string {
   );
 }
 
-export async function signInOwner(): Promise<User> {
+const pendingKey = 'daybasket-owner-sign-in';
+let redirectCompletion: Promise<User | null> | undefined;
+
+export async function signInOwner(): Promise<never> {
   const auth = prepareAdminAuth();
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: 'select_account' });
   try {
-    const result = await signInWithPopup(auth, provider);
+    sessionStorage.setItem(pendingKey, '1');
+  } catch {
+    throw new Error(
+      'This browser cannot store the sign-in session. Open this page in a regular browser window and try again.',
+    );
+  }
+  try {
+    return await signInWithRedirect(auth, provider);
+  } catch (error) {
+    sessionStorage.removeItem(pendingKey);
+    throw error;
+  }
+}
+
+// React may run startup effects twice. Exchange a redirect credential only once.
+export function finishOwnerSignIn(): Promise<User | null> {
+  return (redirectCompletion ??= completeRedirect());
+}
+
+async function completeRedirect(): Promise<User | null> {
+  const auth = prepareAdminAuth();
+  try {
+    const result = await getRedirectResult(auth);
+    if (!result) {
+      if (sessionStorage.getItem(pendingKey)) {
+        throw new Error(
+          'Google sign-in did not finish. Please click Continue with Google to start again.',
+        );
+      }
+      return null;
+    }
     return await request<User>('/auth/owner', 'POST', { token: await result.user.getIdToken() });
   } finally {
+    sessionStorage.removeItem(pendingKey);
     await signOut(auth).catch(() => {});
   }
 }
