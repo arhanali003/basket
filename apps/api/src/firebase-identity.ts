@@ -17,6 +17,12 @@ export function ownerEmailAllowed(email?: string | null): boolean {
   );
 }
 
+// Customer accounts need a valid Google identity, not the owner's verified-email policy.
+export function requireCustomer(identity: DecodedIdToken) {
+  if (identity.firebase.sign_in_provider !== 'google.com')
+    throw new UnauthorizedException('Please continue with Google to sign in.');
+}
+
 export function requireOwner(identity: DecodedIdToken) {
   if (
     !identity.email_verified ||

@@ -3,6 +3,7 @@ import { getAuth } from 'firebase-admin/auth';
 import {
   ownerEmailAllowed,
   requireOwner,
+  requireCustomer,
   verifyFirebaseIdentity,
 } from '../apps/api/src/firebase-identity';
 
@@ -107,4 +108,36 @@ test('retains credential-based revocation checking when no web key is configured
   await verifyFirebaseIdentity('token');
   expect(verify).toHaveBeenCalledWith('token', true);
   expect(global.fetch).not.toHaveBeenCalled();
+});
+
+test.each([true, false, undefined])(
+  'customers can use Google with email_verified=%s',
+  (email_verified) => {
+    const customer = { ...identity, email: 'customer@example.com', email_verified };
+    expect(() => requireCustomer(customer)).not.toThrow();
+    expect(() => requireOwner(customer)).toThrow();
+  },
+);
+test('customers still need a Google identity', () => {
+  expect(() =>
+    requireCustomer({
+      ...identity,
+      firebase: { ...identity.firebase, sign_in_provider: 'password' },
+    }),
+  ).toThrow();
+});
+test('valid Google accounts without email verification pass account validation', async () => {
+  const customer = { ...identity, email_verified: false };
+  verify.mockResolvedValue(customer);
+  (global.fetch as jest.Mock).mockResolvedValue({
+    ok: true,
+    status: 200,
+    json: async () => ({
+      users: [
+        { localId: customer.uid, email: customer.email, emailVerified: false, validSince: '100' },
+      ],
+    }),
+  });
+  const verified = await verifyFirebaseIdentity('valid-google-token');
+  expect(() => requireCustomer(verified)).not.toThrow();
 });

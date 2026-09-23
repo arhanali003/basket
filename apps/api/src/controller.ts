@@ -30,7 +30,7 @@ import {
   homepageSchema,
 } from '../../../packages/types/src';
 import { Database } from './database';
-import { requireOwner, verifyFirebaseIdentity } from './firebase-identity';
+import { requireCustomer, requireOwner, verifyFirebaseIdentity } from './firebase-identity';
 import { Auth, mockMode, hash, equal, sessionToken } from './auth';
 import { canTransition, distanceKm, priceCart } from './domain';
 import { notifyOrder } from './realtime';
@@ -126,8 +126,7 @@ export class ApiController {
       })
       .parse(body);
     const identity = await verifyFirebaseIdentity(token);
-    if (identity.firebase.sign_in_provider !== 'google.com' || !identity.email_verified)
-      throw new BadRequestException('Please sign in with a verified Google account.');
+    requireCustomer(identity);
     const user = await this.db.user.upsert({
       where: { firebaseUid: identity.uid },
       create: { firebaseUid: identity.uid, name, email: identity.email },
