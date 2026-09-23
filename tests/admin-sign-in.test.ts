@@ -19,6 +19,7 @@ jest.mock(
     browserPopupRedirectResolver: 'resolver',
     GoogleAuthProvider: class {
       setCustomParameters() {}
+      addScope() {}
     },
     signInWithRedirect: (...args: unknown[]) => mockRedirect(...args),
     getRedirectResult: (...args: unknown[]) => mockResult(...args),

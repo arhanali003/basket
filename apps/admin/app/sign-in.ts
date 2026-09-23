@@ -59,6 +59,7 @@ let redirectCompletion: Promise<User | null> | undefined;
 export async function signInOwner(): Promise<never> {
   const auth = prepareAdminAuth();
   const provider = new GoogleAuthProvider();
+  provider.addScope('email');
   provider.setCustomParameters({ prompt: 'select_account' });
   try {
     sessionStorage.setItem(pendingKey, '1');
