@@ -23,11 +23,13 @@ import {
   Grid2X2,
 } from 'lucide-react';
 import { io } from 'socket.io-client';
+ import { signInCustomer, signInError } from './sign-in';
 import { api, request } from '@daybasket/api-client';
 import {
   money,
   statuses,
   type Product,
+  type HomepageImages,
   type Category,
   type User,
   type CartLine,
@@ -35,7 +37,7 @@ import {
   type Quote,
   type Order,
 } from '@daybasket/types';
-import { Logo, Modal, Footer, Empty, ErrorNotice } from '@daybasket/ui';
+import { Logo, Modal, Footer, Empty, ErrorNotice, ProductGallery, mediaUrl } from '@daybasket/ui';
 const photo = (id: string, w = 900) =>
   `https://images.unsplash.com/${id}?auto=format&fit=crop&w=${w}&q=85`;
 type Panel = 'login' | 'location' | 'cart' | 'orders' | 'product' | 'tracking' | null;
@@ -71,6 +73,11 @@ export default function Storefront() {
   const [orders, setOrders] = useState<Order[]>([]),
     [tracking, setTracking] = useState<(Order & { deliveryCode?: string }) | null>(null),
     [live, setLive] = useState(false);
+  const [homepage, setHomepage] = useState<HomepageImages>({});
+  const [mockLogin, setMockLogin] = useState(false);
+  const [authReady, setAuthReady] = useState(false);
+  const phoneConfirmation = useRef<ConfirmationResult | null>(null);
+  const captchaContainer = useRef<HTMLDivElement>(null);
   const initialized = useRef(false),
     toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null),
     checkoutKey = useRef<string | null>(null),
@@ -99,6 +106,15 @@ export default function Storefront() {
   }
   useEffect(() => {
     void load();
+    request<HomepageImages>('/homepage')
+      .then(setHomepage)
+      .catch(() => {});
+    request<{ mockProviders: boolean }>('/config')
+      .then((config) => {
+        setMockLogin(config.mockProviders);
+        setAuthReady(true);
+      })
+      .catch(() => setAuthReady(true));
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
     try {
       const c = JSON.parse(localStorage.getItem('daybasket-cart') || '[]') as CartLine[];
@@ -234,11 +250,20 @@ export default function Storefront() {
     setBusy(true);
     setFormError('');
     try {
-      const result = await request<{ challenge: string }>('/auth/otp', 'POST', { phone });
-      setChallenge(result.challenge);
+      if (!/^[6-9]\d{9}$/.test(phone))
+        throw new Error('Enter a valid 10-digit Indian mobile number.');
+      if (mockLogin) {
+        const result = await request<{ challenge: string }>('/auth/otp', 'POST', { phone });
+        setChallenge(result.challenge);
+      } else {
+        if (!captchaContainer.current) throw new Error('Please reopen sign-in and try again.');
+        phoneConfirmation.current = await sendPhoneCode(phone, captchaContainer.current);
+        setChallenge('firebase');
+      }
+      setCode('');
       setResend(60);
     } catch (e) {
-      setFormError((e as Error).message);
+      setFormError(signInError(e));
     } finally {
       setBusy(false);
     }
@@ -247,28 +272,44 @@ export default function Storefront() {
     setBusy(true);
     setFormError('');
     try {
-      const u = await request<User>('/auth/verify', 'POST', {
-        challenge,
-        code,
-        name: name || 'Neighbour',
-      });
-      setUser(u);
-      const [addresses, remote] = await Promise.all([
-        api.addresses(),
-        request<CartLine[]>('/cart'),
-      ]);
-      const merged = new Map(remote.map((i) => [i.productId, i.quantity]));
-      cart.forEach((i) =>
-        merged.set(i.productId, Math.min(20, (merged.get(i.productId) || 0) + i.quantity)),
-      );
-      const combined = [...merged].map(([productId, quantity]) => ({ productId, quantity }));
-      setCart(combined);
-      await request('/cart', 'PUT', combined);
-      setAddress(addresses.at(-1) || null);
-      setPanel(addresses.length ? 'cart' : 'location');
-      message('Welcome to the neighbourhood');
+      const u = !mockLogin
+        ? await verifyPhoneCode(phoneConfirmation.current!, code)
+        : await request<User>('/auth/verify', 'POST', {
+            challenge,
+            code,
+            name: name || 'Neighbour',
+          });
+      setChallenge('');
+      phoneConfirmation.current = null;
+      await finishSignIn(u);
     } catch (e) {
-      setFormError((e as Error).message);
+      setFormError(signInError(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function finishSignIn(u: User) {
+    setUser(u);
+    const [addresses, remote] = await Promise.all([api.addresses(), request<CartLine[]>('/cart')]);
+    const merged = new Map(remote.map((i) => [i.productId, i.quantity]));
+    cart.forEach((i) =>
+      merged.set(i.productId, Math.min(20, (merged.get(i.productId) || 0) + i.quantity)),
+    );
+    const combined = [...merged].map(([productId, quantity]) => ({ productId, quantity }));
+    setCart(combined);
+    await request('/cart', 'PUT', combined);
+    setAddress(addresses.at(-1) || null);
+    setPanel(addresses.length ? 'cart' : 'location');
+    message('Welcome to the neighbourhood');
+  }
+  async function googleLogin() {
+    setBusy(true);
+    setFormError('');
+    try {
+      const u = await signInCustomer();
+      await finishSignIn(u);
+    } catch (e) {
+      setFormError(signInError(e));
     } finally {
       setBusy(false);
     }
@@ -320,7 +361,7 @@ export default function Storefront() {
       setPanel(cart.length ? 'cart' : null);
       message('Delivery address saved');
     } catch (e) {
-      setFormError((e as Error).message);
+      setFormError(signInError(e));
     } finally {
       setBusy(false);
     }
@@ -345,7 +386,7 @@ export default function Storefront() {
       message('Your order is in. Good things are on their way.');
       void load();
     } catch (e) {
-      setFormError((e as Error).message);
+      setFormError(signInError(e));
     } finally {
       setBusy(false);
     }
@@ -357,7 +398,7 @@ export default function Storefront() {
     try {
       setOrders(await api.orders());
     } catch (e) {
-      setFormError((e as Error).message);
+      setFormError(signInError(e));
     } finally {
       setBusy(false);
     }
@@ -512,8 +553,8 @@ export default function Storefront() {
             </div>
             <img
               className="hero-image"
-              src={photo('photo-1542838132-92c53300491e')}
-              alt="A colourful selection of fresh seasonal vegetables"
+              src={mediaUrl(homepage.hero || photo('photo-1542838132-92c53300491e'))}
+              alt="Fresh finds from our store"
               fetchPriority="high"
             />
             <div className="hero-roundel">
@@ -534,7 +575,7 @@ export default function Storefront() {
               Meet your morning <ArrowUpRight size={14} />
             </button>
             <img
-              src={photo('photo-1517673400267-0251440c45dc', 400)}
+              src={mediaUrl(homepage.breakfast || photo('photo-1517673400267-0251440c45dc', 400))}
               alt="Wholesome breakfast oats"
             />
           </div>
@@ -652,7 +693,7 @@ export default function Storefront() {
                       }}
                       aria-label={`View ${p.name}`}
                     >
-                      <img src={p.image} alt={p.name} loading="lazy" />
+                      <img src={mediaUrl(p.image)} alt={p.name} loading="lazy" />
                       <span className="discount-badge">
                         {Math.round((1 - p.price / p.mrp) * 100)}% OFF
                       </span>
@@ -734,7 +775,11 @@ export default function Storefront() {
               <button className="text-link" onClick={() => chooseCategory(id)}>
                 Shop the collection <ArrowUpRight size={12} />
               </button>
-              <img src={photo(img, 300)} alt="" loading="lazy" />
+              <img
+                src={mediaUrl(homepage[id as keyof HomepageImages] || photo(img, 300))}
+                alt=""
+                loading="lazy"
+              />
             </div>
           ))}
         </section>
@@ -789,47 +834,20 @@ export default function Storefront() {
         <p className="address-hint">
           Sign in to save your basket and get everyday goodness delivered.
         </p>
-        <div className="demo-note">
-          Development login · No SMS is sent. Use OTP <b>123456</b> with any non-staff Indian mobile
-          number.
-        </div>
-        <label className="field">
-          Your name
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="What should we call you?"
-            autoComplete="given-name"
-          />
-        </label>
-        <label className="field">
-          Mobile number
-          <input
-            type="tel"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-            placeholder="10-digit mobile number"
-            autoComplete="tel-national"
-            disabled={!!challenge}
-          />
-        </label>
-        {challenge && (
-          <label className="field">
-            Verification code
-            <input
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              placeholder="123456"
-              maxLength={6}
-            />
-          </label>
-        )}
+         <button
+  className="primary full"
+  disabled={busy || !authReady}
+  onClick={googleLogin}
+>
+  Continue with Google / Gmail <ArrowRight size={15} />
+</button>
+        
         {formError && <ErrorNotice message={formError} />}
         <button
           className="primary full"
-          disabled={busy || phone.length !== 10}
+          disabled={
+            busy || !authReady || phone.length !== 10 || (!!challenge && !/^\d{6}$/.test(code))
+          }
           onClick={challenge ? verify : sendCode}
         >
           {busy ? 'One moment…' : challenge ? 'Verify & continue' : 'Send verification code'}
@@ -844,6 +862,27 @@ export default function Storefront() {
           >
             {resend ? `Resend in ${resend}s` : 'Resend code'}
           </button>
+        )}
+        {challenge && (
+          <button
+            className="text-link"
+            disabled={busy}
+            style={{ marginLeft: 16 }}
+            onClick={() => {
+              setChallenge('');
+              setCode('');
+              phoneConfirmation.current = null;
+              setFormError('');
+            }}
+          >
+            Change number
+          </button>
+        )}
+        {!mockLogin && (
+          <p className="address-hint">
+            By requesting a code, you agree to receive a verification SMS. Google processes your
+            phone number for spam and abuse prevention. SMS charges may apply.
+          </p>
         )}
       </Modal>
       <Modal
@@ -982,7 +1021,7 @@ export default function Storefront() {
               const p = products.find((p) => p.id === i.productId);
               return p ? (
                 <div className="cart-line" key={i.productId}>
-                  <img src={p.image} alt="" />
+                  <img src={mediaUrl(p.image)} alt="" />
                   <div className="line-info">
                     <b>{p.name}</b>
                     <small>
@@ -1113,7 +1152,12 @@ export default function Storefront() {
       <Modal open={panel === 'product'} onClose={() => setPanel(null)} title="A closer look" wide>
         {selected && (
           <div className="product-detail">
-            <img src={selected.image} alt={selected.name} />
+            <ProductGallery
+              key={selected.id}
+              image={selected.image}
+              images={selected.images}
+              name={selected.name}
+            />
             <div>
               <span className="eyebrow">{selected.brand}</span>
               <h2>{selected.name}</h2>
@@ -1187,7 +1231,7 @@ export default function Storefront() {
             </p>
             <div className="order-products">
               {o.items.map((i) => (
-                <img src={i.image} key={i.productId} alt={i.name} />
+                <img src={mediaUrl(i.image)} key={i.productId} alt={i.name} />
               ))}
             </div>
             <div className="flex between">
@@ -1313,7 +1357,7 @@ export default function Storefront() {
             </div>
             {tracking.items.map((i) => (
               <div className="cart-line" key={i.productId}>
-                <img src={i.image} alt="" />
+                <img src={mediaUrl(i.image)} alt="" />
                 <div className="line-info">
                   <b>{i.name}</b>
                   <small>
