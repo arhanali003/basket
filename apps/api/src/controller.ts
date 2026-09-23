@@ -132,6 +132,7 @@ export class ApiController {
       create: { firebaseUid: identity.uid, name, email: identity.email },
       update: { name },
     });
+    if (user.role === 'super_admin') requireOwner(identity);
     return this.auth.signIn(user.id, res);
   }
   @Post('auth/owner') async owner(
