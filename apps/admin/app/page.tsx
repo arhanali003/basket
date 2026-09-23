@@ -19,17 +19,19 @@ import {
   Users,
   Wallet,
 } from 'lucide-react';
+import { PhotoPicker } from './photo-picker';
 import { signInOwner } from './sign-in';
 import { api, request } from '@daybasket/api-client';
 import {
   type Product,
+  type HomepageImages,
   type Category,
   type User,
   type Order,
   money,
   statuses,
 } from '@daybasket/types';
-import { Empty, ErrorNotice, Loading, Logo, Modal } from '@daybasket/ui';
+import { Empty, ErrorNotice, Loading, Logo, Modal, mediaUrl } from '@daybasket/ui';
 type Analytics = {
   orders: number;
   revenue: number;
@@ -60,6 +62,15 @@ export default function Admin() {
     [drivers, setDrivers] = useState<{ id: string; name: string }[]>([]),
     [driver, setDriver] = useState(''),
     [notice, setNotice] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [homepage, setHomepage] = useState<HomepageImages>({});
+  const [deleting, setDeleting] = useState<Product | null>(null);
+  useEffect(() => {
+    if (user && tab === 'homepage')
+      request<HomepageImages>('/homepage')
+        .then(setHomepage)
+        .catch((e) => setError(e.message));
+  }, [user, tab]);
   async function refresh() {
     setError('');
     try {
@@ -145,7 +156,8 @@ export default function Admin() {
       categoryId: f.get('categoryId'),
       brand: f.get('brand'),
       description: f.get('description'),
-      image: f.get('image'),
+      image: editing?.images?.[0] || editing?.image || '',
+      images: editing?.images || (editing?.image ? [editing.image] : []),
       unit: f.get('unit'),
       price: Math.round(Number(f.get('price')) * 100),
       mrp: Math.round(Number(f.get('mrp')) * 100),
@@ -317,6 +329,7 @@ export default function Admin() {
             ['overview', LayoutDashboard, 'Overview'],
             ['orders', ShoppingBag, 'Orders'],
             ['products', Package, 'Products'],
+            ['homepage', Leaf, 'Homepage photos'],
             ['delivery', Truck, 'Deliveries'],
             ['audit', ShieldCheck, 'Audit log'],
           ].map(([id, Icon, label]) => {
@@ -375,15 +388,17 @@ export default function Admin() {
             <div>
               <span className="eyebrow muted">LET’S MAKE IT A GOOD DAY</span>
               <h1 style={{ marginTop: 9 }}>
-                {tab === 'overview'
-                  ? 'Hello, store owner.'
-                  : tab === 'orders'
-                    ? 'Every basket has a story.'
-                    : tab === 'products'
-                      ? 'Good things on your shelves.'
-                      : tab === 'delivery'
-                        ? 'From your store to their door.'
-                        : 'A clear record of every change.'}
+                {tab === 'homepage'
+                  ? 'Your homepage photos'
+                  : tab === 'overview'
+                    ? 'Hello, store owner.'
+                    : tab === 'orders'
+                      ? 'Every basket has a story.'
+                      : tab === 'products'
+                        ? 'Good things on your shelves.'
+                        : tab === 'delivery'
+                          ? 'From your store to their door.'
+                          : 'A clear record of every change.'}
               </h1>
               <p>
                 {tab === 'overview'
@@ -564,7 +579,7 @@ export default function Admin() {
                           <tr key={p.id}>
                             <td>
                               <div className="table-product">
-                                <img src={p.image} alt="" />
+                                <img src={mediaUrl(p.image)} alt="" />
                                 <div>
                                   <b>{p.name}</b>
                                   <small>
@@ -591,10 +606,21 @@ export default function Admin() {
                                 className="text-link"
                                 onClick={() => {
                                   setError('');
-                                  setEditing(p);
+                                  setEditing({
+                                    ...p,
+                                    images: p.images?.length ? p.images : [p.image],
+                                  });
                                 }}
                               >
                                 Edit <ArrowRight size={12} />
+                              </button>
+                              <button
+                                className="text-link"
+                                style={{ marginLeft: 14, color: '#a52a2a' }}
+                                disabled={busy}
+                                onClick={() => setDeleting(p)}
+                              >
+                                Delete
                               </button>
                             </td>
                           </tr>
@@ -604,6 +630,43 @@ export default function Admin() {
                 </div>
               </section>
             </>
+          )}
+          {tab === 'homepage' && (
+            <section className="panel" style={{ padding: 24 }}>
+              <h2>Make the homepage yours</h2>
+              <p>
+                Upload a photo for each area, then save. Remove a custom photo to restore the
+                original.
+              </p>
+              {(
+                [
+                  ['hero', 'Main banner'],
+                  ['breakfast', 'Breakfast banner'],
+                  ['dairy', 'Bakery collection'],
+                  ['snacks', 'Snacks collection'],
+                  ['pantry', 'Pantry collection'],
+                ] as const
+              ).map(([key, label]) => (
+                <PhotoPicker
+                  key={key}
+                  label={label}
+                  max={1}
+                  value={homepage[key] ? [homepage[key]!] : []}
+                  disabled={busy || uploading}
+                  onBusy={setUploading}
+                  onChange={(photos) =>
+                    setHomepage((current) => ({ ...current, [key]: photos[0] }))
+                  }
+                />
+              ))}
+              <button
+                className="primary"
+                disabled={busy || uploading}
+                onClick={() => mutate('/admin/homepage', 'PUT', homepage)}
+              >
+                Save homepage photos
+              </button>
+            </section>
           )}
           {(tab === 'orders' || tab === 'delivery') && (
             <>
@@ -679,8 +742,38 @@ export default function Admin() {
         </div>
       </main>
       <Modal
+        open={!!deleting}
+        onClose={() => {
+          if (!busy) setDeleting(null);
+        }}
+        title="Delete product?"
+      >
+        <p>
+          Remove {deleting?.name} from your listings and customer baskets? Past order records will
+          be kept.
+        </p>
+        {error && <ErrorNotice message={error} />}
+        <div className="flex">
+          <button className="secondary" disabled={busy} onClick={() => setDeleting(null)}>
+            Keep product
+          </button>
+          <button
+            className="primary"
+            disabled={busy}
+            onClick={async () => {
+              if (deleting && (await mutate('/admin/products/' + deleting.id, 'DELETE', {})))
+                setDeleting(null);
+            }}
+          >
+            Delete product
+          </button>
+        </div>
+      </Modal>
+      <Modal
         open={!!editing}
-        onClose={() => setEditing(null)}
+        onClose={() => {
+          if (!busy && !uploading) setEditing(null);
+        }}
         title={editing?.id ? 'Keep the good things fresh' : 'Add a little everyday good'}
         wide
       >
@@ -764,10 +857,17 @@ export default function Admin() {
                   />
                 </label>
               </div>
-              <label className="field">
-                Product photo HTTPS URL
-                <input type="url" name="image" defaultValue={editing.image} required />
-              </label>
+              <PhotoPicker
+                label="Product photos"
+                value={editing.images || (editing.image ? [editing.image] : [])}
+                disabled={busy}
+                onBusy={setUploading}
+                onChange={(images) =>
+                  setEditing((current) =>
+                    current ? { ...current, images, image: images[0] || '' } : null,
+                  )
+                }
+              />
               <label className="field">
                 Description
                 <textarea name="description" defaultValue={editing.description} required />
@@ -782,7 +882,7 @@ export default function Admin() {
                 Active in storefront
               </label>
               {error && <ErrorNotice message={error} />}
-              <button className="primary" disabled={busy}>
+              <button className="primary" disabled={busy || uploading || !editing.image}>
                 Save product <CheckIcon />
               </button>
             </form>
