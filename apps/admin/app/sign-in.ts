@@ -8,6 +8,7 @@ import {
   signInWithRedirect,
   getRedirectResult,
   signOut,
+  sendEmailVerification,
 } from 'firebase/auth';
 import { request } from '@daybasket/api-client';
 import type { User } from '@daybasket/types';
@@ -93,7 +94,15 @@ async function completeRedirect(): Promise<User | null> {
       }
       return null;
     }
-    return await request<User>('/auth/owner', 'POST', { token: await result.user.getIdToken() });
+    await result.user.reload();
+    const token = await result.user.getIdToken(true);
+    if (!result.user.emailVerified) {
+      await sendEmailVerification(result.user);
+      throw new Error(
+        'A verification link has been sent to your Google email. Open your inbox (or spam folder), click the link, then return here and sign in again.',
+      );
+    }
+    return await request<User>('/auth/owner', 'POST', { token });
   } finally {
     sessionStorage.removeItem(pendingKey);
     await signOut(auth).catch(() => {});

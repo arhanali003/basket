@@ -2,6 +2,7 @@ const mockRequest = jest.fn();
 const mockRedirect = jest.fn();
 const mockResult = jest.fn();
 const mockSignOut = jest.fn();
+const mockVerification = jest.fn();
 const mockInitialize = jest.fn(() => ({}));
 jest.mock(
   'firebase/app',
@@ -24,6 +25,7 @@ jest.mock(
     signInWithRedirect: (...args: unknown[]) => mockRedirect(...args),
     getRedirectResult: (...args: unknown[]) => mockResult(...args),
     signOut: (...args: unknown[]) => mockSignOut(...args),
+    sendEmailVerification: (...args: unknown[]) => mockVerification(...args),
   }),
   { virtual: true },
 );
@@ -76,7 +78,7 @@ test('uses the admin origin and session persistence for the redirect', async () 
   expect(memory.get('daybasket-owner-sign-in')).toBe('1');
 });
 test('exchanges a returned Google credential once even with repeated startup calls', async () => {
-  mockResult.mockResolvedValue({ user: { getIdToken: async () => 'verified-token' } });
+  mockResult.mockResolvedValue({ user: { reload: jest.fn().mockResolvedValue(undefined), emailVerified: true, getIdToken: jest.fn().mockResolvedValue('verified-token') } });
   mockRequest.mockResolvedValue({ id: 'owner', role: 'super_admin' });
   const { finishOwnerSignIn } = await import('../apps/admin/app/sign-in');
   const results = await Promise.all([finishOwnerSignIn(), finishOwnerSignIn()]);
@@ -86,7 +88,7 @@ test('exchanges a returned Google credential once even with repeated startup cal
   expect(mockSignOut).toHaveBeenCalledTimes(1);
 });
 test('keeps backend access rejection visible and clears temporary identity', async () => {
-  mockResult.mockResolvedValue({ user: { getIdToken: async () => 'token' } });
+  mockResult.mockResolvedValue({ user: { reload: jest.fn().mockResolvedValue(undefined), emailVerified: true, getIdToken: jest.fn().mockResolvedValue('token') } });
   mockRequest.mockRejectedValue(new Error('This account does not have store access'));
   const { finishOwnerSignIn } = await import('../apps/admin/app/sign-in');
   await expect(finishOwnerSignIn()).rejects.toThrow('store access');
@@ -111,4 +113,17 @@ test('blocked session storage is reported before leaving the page', async () => 
   const { signInOwner } = await import('../apps/admin/app/sign-in');
   await expect(signInOwner()).rejects.toThrow('cannot store');
   expect(mockRedirect).not.toHaveBeenCalled();
+});
+
+test('sends verification for an unverified account without creating an admin session', async () => {
+  const user = { reload: jest.fn().mockResolvedValue(undefined), emailVerified: false, getIdToken: jest.fn().mockResolvedValue('fresh-token') };
+  mockResult.mockResolvedValue({ user });
+  mockVerification.mockResolvedValue(undefined);
+  const { finishOwnerSignIn } = await import('../apps/admin/app/sign-in');
+  await expect(finishOwnerSignIn()).rejects.toThrow('verification link has been sent');
+  expect(user.reload).toHaveBeenCalledTimes(1);
+  expect(user.getIdToken).toHaveBeenCalledWith(true);
+  expect(mockVerification).toHaveBeenCalledWith(user);
+  expect(mockRequest).not.toHaveBeenCalled();
+  expect(mockSignOut).toHaveBeenCalledTimes(1);
 });

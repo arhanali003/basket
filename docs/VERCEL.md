@@ -8,7 +8,7 @@ Source: https://github.com/arhanali003/basket. Read STATUS.md for application li
 - Backend: https://basket-api-eight.vercel.app (Vercel project `basket-api`, root `apps/api`, NestJS preset).
 - Database: Neon PostgreSQL Free, connected privately to the API production environment through Vercel Marketplace.
 
-The production migration and catalogue seed have run. The database contains 16 products across 8 categories; production seeding skips development accounts. API health, database readiness, catalogue loading, checkout quotes, rejected untrusted origins and unauthenticated access checks passed on 2026-09-22. The admin login page is deployed at https://basket-admin-delta.vercel.app (`basket-admin`, root `apps/admin`); owner authentication setup is incomplete. The delivery app is not deployed.
+The production migration and catalogue seed have run. The database contains 16 products across 8 categories; production seeding skips development accounts. API health, database readiness, catalogue loading, checkout quotes, rejected untrusted origins and unauthenticated access checks passed on 2026-09-22. The admin login page is deployed at https://basket-admin-delta.vercel.app (`basket-admin`, root `apps/admin`); owner access is configured; a real owner sign-in is being verified. The delivery app is not deployed.
 
 The API build script generates the PostgreSQL Prisma client and compiles the application. Production builds also apply committed migrations; `SEED_CATALOGUE=true` runs a create-only catalogue seed. Preview builds do not migrate or seed production data. Review migrations before pushing to the production branch.
 
@@ -46,7 +46,7 @@ References: https://vercel.com/docs/monorepos and https://vercel.com/docs/plans/
 
 The admin production build uses Firebase Google sign-in and same-origin API proxying. Configure `API_ORIGIN`, `NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`, and `NEXT_PUBLIC_FIREBASE_PROJECT_ID` in the admin project before building. Local demo login remains development-only.
 
-The Google provider is enabled. The admin domain authorization and backend environment settings are pending confirmation. The API CORS allowlist already includes the exact admin origin.
+The Google provider and admin domain are enabled. ADMIN_EMAILS and FIREBASE_WEB_API_KEY are configured in the API production environment, and the API was redeployed. The API CORS allowlist includes the exact admin origin.
 
 Set `ADMIN_EMAILS` privately on the API to a comma-separated list of approved owner Google emails. Set `FIREBASE_PROJECT_ID` and `FIREBASE_WEB_API_KEY` to the matching Firebase project configuration. The web API key identifies the project; it is not a service-account key. The backend verifies token signatures, issuer, audience and expiry through the Admin SDK, then checks current account state and revocation through Firebase's authenticated account lookup. It rejects disabled/deleted accounts and stale or unverified emails without needing a private service-account key on Vercel.
 

@@ -81,8 +81,9 @@ test('admin can create catalogue products', async ({ page }) => {
   await page.getByLabel('MRP').fill('149');
   await page.getByLabel('Pack size').fill('500 g');
   await page
-    .getByLabel('Product photo HTTPS URL')
+    .getByLabel('Product photos HTTPS URL')
     .fill('https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6');
+  await page.getByRole('button', { name: 'Add photo', exact: true }).click();
   await page
     .getByLabel('Description', { exact: true })
     .fill('Fresh apples for automated catalogue verification.');

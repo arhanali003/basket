@@ -1,5 +1,9 @@
 # Owner and employee Google access
 
+Use the production admin address: https://basket-admin-delta.vercel.app. The Git preview address (`basket-admin-git-main-arhanquikit.vercel.app`) is not an authorized Google sign-in domain and can report `auth/unauthorized-domain`.
+
+Verified on 2026-09-23: opening the production address in Safari restored the existing owner session and loaded the owner dashboard and analytics. All 19 Firebase identity tests passed. A fresh Google sign-in was not completed during this check; the in-app browser did not expose the Google popup. Use Safari or Chrome for Google sign-in.
+
 Open the Vercel **basket-api** project → **Settings → Environment Variables**.
 
 - `ADMIN_EMAILS`: comma-separated Google emails for owners.
