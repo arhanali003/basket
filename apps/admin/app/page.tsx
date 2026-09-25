@@ -1009,7 +1009,7 @@ export default function Admin() {
                   <ArrowRight size={14} />
                 </button>
               )}
-              {selected.status === 'ready_for_pickup' && (
+              {selected.status === 'ready_for_pickup' && drivers.length > 0 && (
                 <>
                   <select
                     aria-label="Delivery partner"
@@ -1033,6 +1033,17 @@ export default function Admin() {
                     Assign partner
                   </button>
                 </>
+              )}
+              {['ready_for_pickup', 'assigned'].includes(selected.status) && (
+                <button className="primary" disabled={busy} onClick={() => mutate(`/orders/${selected.id}/status`, 'PATCH', { status: 'out_for_delivery' })}>
+                  Mark picked up / out for delivery
+                </button>
+              )}
+              {['out_for_delivery', 'arriving'].includes(selected.status) && (
+                <button className="primary" disabled={busy} onClick={() => {
+                  const code = window.prompt('Enter the delivery code provided by the customer');
+                  if (code) void mutate(`/orders/${selected.id}/status`, 'PATCH', { status: 'delivered', code });
+                }}>Mark delivered successfully</button>
               )}
               {['placed', 'accepted'].includes(selected.status) && (
                 <button

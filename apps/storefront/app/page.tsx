@@ -5,7 +5,6 @@ import {
   ArrowUpRight,
   Check,
   ChevronDown,
-  Clock3,
   Heart,
   Home,
   Leaf,
@@ -59,6 +58,8 @@ export default function Storefront() {
     [busy, setBusy] = useState(false),
     [formError, setFormError] = useState('');
   const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
   const [address, setAddress] = useState<Address | null>(null),
     [geo, setGeo] = useState({ latitude: 12.9784, longitude: 77.6408 }),
     [geoLabel, setGeoLabel] = useState('Development pin: Indiranagar store area'),
@@ -241,13 +242,13 @@ export default function Storefront() {
     setPanel(addresses.length ? 'cart' : 'location');
     message('Welcome to the neighbourhood');
   }
-  async function googleLogin() {
+  async function passwordLogin() {
     setBusy(true);
     setFormError('');
     try {
       if (name.trim().length < 2)
         throw new Error('Please enter your name (at least 2 characters).');
-      const u = await signInCustomer(name.trim());
+      const u = await signInCustomer(name.trim(), phone.trim(), password);
       await finishSignIn(u);
     } catch (e) {
       setFormError(signInError(e));
@@ -292,7 +293,7 @@ export default function Storefront() {
         phone: f.get('phone'),
         line: f.get('line'),
         city: f.get('city'),
-        state: 'Karnataka',
+        state: f.get('state'),
         pincode: f.get('pincode'),
         instructions: f.get('instructions'),
         latitude: Number(f.get('latitude')),
@@ -461,9 +462,6 @@ export default function Storefront() {
               </button>
             ))}
           </div>
-          <span className="nav-promise">
-            <Leaf size={13} /> Fresh picks. Fair prices. Every day.
-          </span>
         </nav>
       </header>
       <main className="store-main">
@@ -498,11 +496,6 @@ export default function Storefront() {
               alt="Fresh finds from our store"
               fetchPriority="high"
             />
-            <div className="hero-roundel">
-              <small>FRESH FINDS IN</small>
-              <b>30–60</b>
-              <small>MINUTES</small>
-            </div>
           </div>
           <div className="hero-side">
             <span className="eyebrow">THE SLOW MORNING CLUB</span>
@@ -523,7 +516,6 @@ export default function Storefront() {
         </section>
         <section className="perks" aria-label="Our promises">
           {[
-            [Truck, 'At your door in 30–60 min', 'Your everyday, without the wait'],
             [Leaf, 'Freshness comes first', 'Thoughtfully picked. Quality checked.'],
             [ShieldCheck, 'Good prices. No surprises.', 'A little more value in every basket'],
             [PackageCheck, 'Packed with a little care', 'From our neighbourhood to yours'],
@@ -543,8 +535,8 @@ export default function Storefront() {
         <section className="shop-section">
           <div className="section-heading">
             <div>
-              <h2>A little bit of everything</h2>
-              <p>Whatever your day needs, find it here.</p>
+              <h2>Shop by category</h2>
+              <p>Choose what you need today.</p>
             </div>
             <button className="text-link" onClick={() => chooseCategory('all')}>
               Explore all categories <ArrowRight size={13} />
@@ -647,9 +639,6 @@ export default function Storefront() {
                     >
                       <Heart size={13} fill={saved.includes(p.id) ? 'currentColor' : 'none'} />
                     </button>
-                    <span className="delivery-time">
-                      <Clock3 size={10} /> 30–60 MINS
-                    </span>
                     <button
                       className="product-name"
                       onClick={() => {
@@ -769,12 +758,12 @@ export default function Storefront() {
       </nav>
       <Modal open={panel === 'login'} onClose={() => setPanel(null)} title="Hello, neighbour.">
         <p className="address-hint">
-          Enter your name and continue with Google to save your basket and place orders.
+          Sign in with your phone number and password. No OTP or Google account is required.
         </p>
         <form
           onSubmit={(event) => {
             event.preventDefault();
-            void googleLogin();
+            void passwordLogin();
           }}
         >
           <label className="field">
@@ -791,9 +780,37 @@ export default function Storefront() {
               placeholder="Enter your full name"
             />
           </label>
+          <label className="field">
+            Phone number
+            <input
+              name="phone"
+              inputMode="numeric"
+              autoComplete="tel"
+              value={phone}
+              onChange={(event) => setPhone(event.target.value.replace(/\D/g, '').slice(0, 10))}
+              pattern="[6-9][0-9]{9}"
+              required
+              disabled={busy}
+              placeholder="10-digit mobile number"
+            />
+          </label>
+          <label className="field">
+            Password
+            <input
+              name="password"
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              minLength={4}
+              required
+              disabled={busy}
+              placeholder="At least 4 characters"
+            />
+          </label>
           {formError && <ErrorNotice message={formError} />}
-          <button className="primary full" type="submit" disabled={busy || name.trim().length < 2}>
-            {busy ? 'Signing in…' : 'Continue with Google'} <ArrowRight size={15} />
+          <button className="primary full" type="submit" disabled={busy || name.trim().length < 2 || !/^[6-9]\d{9}$/.test(phone) || password.length < 4}>
+            {busy ? 'Signing in…' : 'Continue'} <ArrowRight size={15} />
           </button>
         </form>
       </Modal>
@@ -808,8 +825,7 @@ export default function Storefront() {
           you choose the button below.
         </p>
         <div className="demo-note">
-          Development delivery zone: within 8 km of Indiranagar, Bengaluru. Live Places and maps
-          require configuration; no address geocoding is being simulated.
+          Save your complete address below. Delivery availability is checked separately at checkout.
         </div>
         <button className="secondary" onClick={locate} disabled={busy}>
           <Navigation size={15} />
@@ -849,18 +865,20 @@ export default function Storefront() {
           <div className="form-grid">
             <label className="field">
               City
-              <input name="city" defaultValue={address?.city || 'Bengaluru'} required />
+              <input name="city" defaultValue={address?.city || ''} placeholder="Your city" required />
             </label>
             <label className="field">
               PIN code
               <input
                 name="pincode"
-                defaultValue={address?.pincode || '560038'}
+                defaultValue={address?.pincode || ''}
+                placeholder="6-digit PIN code"
                 required
                 pattern="[0-9]{6}"
               />
             </label>
           </div>
+          <label className="field">State<input name="state" defaultValue={address?.state || ''} placeholder="Your state" required /></label>
           <p className="address-hint">{geoLabel}</p>
           <div className="form-grid">
             <label className="field">
@@ -896,7 +914,7 @@ export default function Storefront() {
           </label>
           {formError && <ErrorNotice message={formError} />}
           <button className="primary full" disabled={busy}>
-            Check availability & save <Check size={15} />
+            Save address <Check size={15} />
           </button>
         </form>
       </Modal>
@@ -1086,9 +1104,6 @@ export default function Storefront() {
                 </span>
                 {quantity(selected)}
               </div>
-              <p>
-                <Truck size={13} style={{ display: 'inline' }} /> At your door in 30–60 minutes
-              </p>
               <button
                 className="text-link"
                 onClick={() => {

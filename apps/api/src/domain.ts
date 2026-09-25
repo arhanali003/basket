@@ -46,7 +46,7 @@ export const transitions: Record<string, string[]> = {
   accepted: ['picking', 'cancelled'],
   picking: ['packed'],
   packed: ['ready_for_pickup'],
-  ready_for_pickup: ['assigned'],
+  ready_for_pickup: ['assigned', 'out_for_delivery'],
   assigned: ['out_for_delivery'],
   out_for_delivery: ['arriving', 'delivered'],
   arriving: ['delivered'],

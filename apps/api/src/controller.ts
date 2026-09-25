@@ -22,6 +22,7 @@ import { Prisma } from '@prisma/client';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { randomUUID, createHmac } from 'node:crypto';
+import { compare, hash as passwordHash } from 'bcryptjs';
 import {
   addressSchema,
   cartSchema,
@@ -77,7 +78,6 @@ export class ApiController {
       brand: 'Daybasket',
       developmentPlaceholder: true,
       mockProviders: mockMode,
-      promise: '30–60 minutes',
       minimumOrder: 9900,
       store: { latitude: 12.9784, longitude: 77.6408, radiusKm: 8 },
     };
@@ -141,6 +141,30 @@ export class ApiController {
       throw new ForbiddenException(
         'Your store role changed. Sign in through the admin page again.',
       );
+    return this.auth.signIn(user.id, res);
+  }
+  @Post('auth/password') async passwordLogin(
+    @Body() body: unknown,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { phone, password, name } = z
+      .object({
+        phone: z.string().regex(/^[6-9]\d{9}$/),
+        password: z.string().min(4).max(128),
+        name: z.string().trim().min(2).max(80),
+      })
+      .parse(body);
+    let user = await this.db.user.findUnique({ where: { phone } });
+    if (user && user.role !== 'customer')
+      throw new ForbiddenException('Use the staff login for this account');
+    if (user) {
+      if (!user.passwordHash || !(await compare(password, user.passwordHash)))
+        throw new ForbiddenException('Incorrect phone number or password');
+    } else {
+      user = await this.db.user.create({
+        data: { phone, name, passwordHash: await passwordHash(password, 12) },
+      });
+    }
     return this.auth.signIn(user.id, res);
   }
   @Post('auth/owner') async owner(
@@ -253,8 +277,6 @@ export class ApiController {
   @Post('addresses') async saveAddress(@Req() req: Request, @Body() body: unknown) {
     const u = await this.auth.user(req);
     const address = addressSchema.parse(body);
-    if (!(await this.eligible(address)))
-      throw new BadRequestException('This address is outside our delivery area');
     return this.db.address.create({ data: { ...address, userId: u.id } });
   }
   @Get('cart') async cart(@Req() req: Request) {
