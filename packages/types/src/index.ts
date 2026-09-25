@@ -43,6 +43,14 @@ export const imageSchema = z
     'Choose an uploaded photo or an HTTPS image URL',
   );
 export const homepageSchema = z.object({
+  heroEyebrow: z.string().max(80).optional(),
+  heroTitle: z.string().max(100).optional(),
+  heroDescription: z.string().max(240).optional(),
+  heroButton: z.string().max(40).optional(),
+  sideEyebrow: z.string().max(80).optional(),
+  sideTitle: z.string().max(100).optional(),
+  sideDescription: z.string().max(240).optional(),
+  sideButton: z.string().max(40).optional(),
   hero: imageSchema.optional(),
   breakfast: imageSchema.optional(),
   dairy: imageSchema.optional(),

@@ -160,6 +160,8 @@
   display: flex;
 }
 .hero-copy {
+  overflow-wrap: anywhere;
+  white-space: pre-line;
   padding: 43px 35px;
   position: relative;
   z-index: 2;

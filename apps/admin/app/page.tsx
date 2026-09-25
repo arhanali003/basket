@@ -340,7 +340,7 @@ export default function Admin() {
             ['overview', LayoutDashboard, 'Overview'],
             ['orders', ShoppingBag, 'Orders'],
             ['products', Package, 'Products'],
-            ['homepage', Leaf, 'Homepage photos'],
+            ['homepage', Leaf, 'Homepage offers'],
             ['delivery', Truck, 'Deliveries'],
             ['audit', ShieldCheck, 'Audit log'],
           ].map(([id, Icon, label]) => {
@@ -400,7 +400,7 @@ export default function Admin() {
               <span className="eyebrow muted">LET’S MAKE IT A GOOD DAY</span>
               <h1 style={{ marginTop: 9 }}>
                 {tab === 'homepage'
-                  ? 'Your homepage photos'
+                  ? 'Your homepage offers'
                   : tab === 'overview'
                     ? 'Hello, store owner.'
                     : tab === 'orders'
@@ -660,13 +660,54 @@ export default function Admin() {
             <section className="panel" style={{ padding: 24 }}>
               <h2>Make the homepage yours</h2>
               <p>
-                Upload a photo for each area, then save. Remove a custom photo to restore the
-                original.
+                Write your own offers and upload banner photos, then save to publish them on the
+                storefront.
+              </p>
+              <div className="form-grid">
+                {(
+                  [
+                    ['heroEyebrow', 'Main banner — small heading', 'THIS WEEK AT DAYBASKET', 80],
+                    ['heroTitle', 'Main banner — offer title', 'Fresh picks. Great offers.', 100],
+                    [
+                      'heroDescription',
+                      'Main banner — offer details',
+                      'Discover the latest offers on your everyday essentials.',
+                      240,
+                    ],
+                    ['heroButton', 'Main banner — button text', 'Shop offers', 40],
+                    ['sideEyebrow', 'Side banner — small heading', 'MORE TO DISCOVER', 80],
+                    ['sideTitle', 'Side banner — offer title', 'Your daily essentials.', 100],
+                    [
+                      'sideDescription',
+                      'Side banner — offer details',
+                      'Find something good for every day.',
+                      240,
+                    ],
+                    ['sideButton', 'Side banner — button text', 'Explore the store', 40],
+                  ] as const
+                ).map(([key, label, fallback, limit]) => (
+                  <label className="field" key={key}>
+                    {label}
+                    <textarea
+                      rows={key.endsWith('Description') ? 3 : 2}
+                      maxLength={limit}
+                      value={homepage[key] ?? fallback}
+                      disabled={busy}
+                      onChange={(event) =>
+                        setHomepage((current) => ({ ...current, [key]: event.target.value }))
+                      }
+                    />
+                  </label>
+                ))}
+              </div>
+              <p>
+                Banner text advertises your offers. Set the actual selling prices and discounts
+                separately in Products.
               </p>
               {(
                 [
                   ['hero', 'Main banner'],
-                  ['breakfast', 'Breakfast banner'],
+                  ['breakfast', 'Side banner'],
                   ['dairy', 'Bakery collection'],
                   ['snacks', 'Snacks collection'],
                   ['pantry', 'Pantry collection'],
@@ -689,7 +730,7 @@ export default function Admin() {
                 disabled={busy || uploading}
                 onClick={() => mutate('/admin/homepage', 'PUT', homepage)}
               >
-                Save homepage photos
+                Save homepage offers
               </button>
             </section>
           )}
@@ -1038,16 +1079,28 @@ export default function Admin() {
                 </>
               )}
               {['ready_for_pickup', 'assigned'].includes(selected.status) && (
-                <button className="primary" disabled={busy} onClick={() => mutate(`/orders/${selected.id}/status`, 'PATCH', { status: 'out_for_delivery' })}>
+                <button
+                  className="primary"
+                  disabled={busy}
+                  onClick={() =>
+                    mutate(`/orders/${selected.id}/status`, 'PATCH', { status: 'out_for_delivery' })
+                  }
+                >
                   Mark picked up / out for delivery
                 </button>
               )}
               {['out_for_delivery', 'arriving'].includes(selected.status) && (
-                <button className="primary" disabled={busy} onClick={() => {
-                  setConfirmationCode('');
-                  setDeliveryError('');
-                  setConfirmDelivery(selected);
-                }}>Mark delivered successfully</button>
+                <button
+                  className="primary"
+                  disabled={busy}
+                  onClick={() => {
+                    setConfirmationCode('');
+                    setDeliveryError('');
+                    setConfirmDelivery(selected);
+                  }}
+                >
+                  Mark delivered successfully
+                </button>
               )}
               {['placed', 'accepted'].includes(selected.status) && (
                 <button
@@ -1087,30 +1140,72 @@ export default function Admin() {
           </div>
         )}
       </Modal>
-      <Modal open={!!confirmDelivery} onClose={() => { if (!busy) setConfirmDelivery(null); }} title="Confirm delivery">
-        <form onSubmit={async (event) => {
-          event.preventDefault();
-          if (!confirmDelivery || busy) return;
-          setBusy(true);
-          setDeliveryError('');
-          try {
-            await request(`/orders/${confirmDelivery.id}/status`, 'PATCH', { status: 'delivered', code: confirmationCode.trim() });
-            setConfirmDelivery(null);
-            setNotice('Delivery confirmed successfully');
-            await refresh();
-            if (selected) setSelected(await api.order(selected.id));
-          } catch (error) {
-            setDeliveryError(error instanceof Error ? error.message : 'Unable to confirm delivery. Please try again.');
-          } finally { setBusy(false); }
-        }}>
-          <p className="muted">Ask the customer for their delivery code to confirm this order has arrived.</p>
-          <label className="field">Delivery verification code
-            <input autoFocus aria-label="Delivery verification code" type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]+" maxLength={8} required value={confirmationCode} onChange={(event) => setConfirmationCode(event.target.value.replace(/\D/g, ''))} placeholder="Enter customer’s code" disabled={busy} />
+      <Modal
+        open={!!confirmDelivery}
+        onClose={() => {
+          if (!busy) setConfirmDelivery(null);
+        }}
+        title="Confirm delivery"
+      >
+        <form
+          onSubmit={async (event) => {
+            event.preventDefault();
+            if (!confirmDelivery || busy) return;
+            setBusy(true);
+            setDeliveryError('');
+            try {
+              await request(`/orders/${confirmDelivery.id}/status`, 'PATCH', {
+                status: 'delivered',
+                code: confirmationCode.trim(),
+              });
+              setConfirmDelivery(null);
+              setNotice('Delivery confirmed successfully');
+              await refresh();
+              if (selected) setSelected(await api.order(selected.id));
+            } catch (error) {
+              setDeliveryError(
+                error instanceof Error
+                  ? error.message
+                  : 'Unable to confirm delivery. Please try again.',
+              );
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          <p className="muted">
+            Ask the customer for their delivery code to confirm this order has arrived.
+          </p>
+          <label className="field">
+            Delivery verification code
+            <input
+              autoFocus
+              aria-label="Delivery verification code"
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              pattern="[0-9]+"
+              maxLength={8}
+              required
+              value={confirmationCode}
+              onChange={(event) => setConfirmationCode(event.target.value.replace(/\D/g, ''))}
+              placeholder="Enter customer’s code"
+              disabled={busy}
+            />
           </label>
           {deliveryError && <ErrorNotice message={deliveryError} />}
           <div className="order-actions">
-            <button className="secondary" type="button" disabled={busy} onClick={() => setConfirmDelivery(null)}>Cancel</button>
-            <button className="primary" type="submit" disabled={busy || !confirmationCode.trim()}>{busy ? 'Verifying…' : 'Verify & confirm delivery'} <ShieldCheck size={15} /></button>
+            <button
+              className="secondary"
+              type="button"
+              disabled={busy}
+              onClick={() => setConfirmDelivery(null)}
+            >
+              Cancel
+            </button>
+            <button className="primary" type="submit" disabled={busy || !confirmationCode.trim()}>
+              {busy ? 'Verifying…' : 'Verify & confirm delivery'} <ShieldCheck size={15} />
+            </button>
           </div>
         </form>
       </Modal>

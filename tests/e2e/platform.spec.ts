@@ -210,7 +210,7 @@ test('server pricing, idempotency, IDOR prevention, fulfilment, authenticated tr
   outsider.disconnect();
   await Promise.all([a.dispose(), b.dispose(), admin.dispose(), driver.dispose()]);
 });
-test('concurrent checkout cannot oversell; cancellation restores exactly once; remote address denied', async () => {
+test('concurrent checkout cannot oversell; cancellation restores exactly once; nationwide address accepted', async () => {
   const a = await customer(uniquePhone()),
     admin = await staff();
   const aid = await address(a);
@@ -255,7 +255,7 @@ test('concurrent checkout cannot oversell; cancellation restores exactly once; r
   const remote = await a.post(base + '/serviceability', {
     data: { latitude: 28.6139, longitude: 77.209 },
   });
-  expect((await remote.json()).serviceable).toBe(false);
+  expect((await remote.json()).serviceable).toBe(true);
   await a.dispose();
   await admin.dispose();
 });

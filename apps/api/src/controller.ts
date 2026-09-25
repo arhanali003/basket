@@ -79,7 +79,8 @@ export class ApiController {
       developmentPlaceholder: true,
       mockProviders: mockMode,
       minimumOrder: 9900,
-      store: { latitude: 12.9784, longitude: 77.6408, radiusKm: 8 },
+      deliveryCoverage: 'India',
+      store: { latitude: 12.9784, longitude: 77.6408 },
     };
   }
   @Post('auth/otp')
@@ -263,9 +264,9 @@ export class ApiController {
   }
   async eligible(address: { latitude: number; longitude: number }) {
     const stores = await this.db.store.findMany({ where: { active: true } });
-    return stores
-      .filter((s) => distanceKm(s, address) <= s.radiusKm)
-      .sort((a, b) => distanceKm(a, address) - distanceKm(b, address))[0];
+    // Nationwide orders are routed to the nearest active fulfilment store.
+    // A local store radius must not reject an Indian shipping address.
+    return stores.sort((a, b) => distanceKm(a, address) - distanceKm(b, address))[0];
   }
   @Post('serviceability') async serviceability(@Body() body: unknown) {
     const a = z
@@ -370,7 +371,7 @@ export class ApiController {
     });
     if (!address) throw new BadRequestException('Choose your saved address');
     const store = await this.eligible(address);
-    if (!store) throw new BadRequestException('Address is not serviceable');
+    if (!store) throw new BadRequestException('Ordering is temporarily unavailable. Please try again later.');
     try {
       const order = await this.db.$transaction(
         async (tx) => {

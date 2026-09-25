@@ -5,15 +5,12 @@ import {
   ArrowUpRight,
   Check,
   ChevronDown,
-  Heart,
   Home,
   Leaf,
   MapPin,
   Navigation,
-  PackageCheck,
   Plus,
   Search,
-  ShieldCheck,
   ShoppingBasket,
   Sparkles,
   Truck,
@@ -47,11 +44,9 @@ export default function Storefront() {
     [error, setError] = useState('');
   const [user, setUser] = useState<User | null>(null),
     [cart, setCart] = useState<CartLine[]>([]),
-    [saved, setSaved] = useState<string[]>([]),
     [category, setCategory] = useState('all'),
     [search, setSearch] = useState(''),
-    [sort, setSort] = useState('popular'),
-    [onlySaved, setOnlySaved] = useState(false);
+    [sort, setSort] = useState('popular');
   const [panel, setPanel] = useState<Panel>(null),
     [selected, setSelected] = useState<Product | null>(null),
     [toast, setToast] = useState(''),
@@ -112,7 +107,6 @@ export default function Storefront() {
               typeof i.productId === 'string' && Number.isInteger(i.quantity) && i.quantity > 0,
           ),
         );
-      setSaved(JSON.parse(localStorage.getItem('daybasket-wishlist') || '[]'));
     } catch {
       /* Ignore malformed local development storage. */
     }
@@ -132,9 +126,6 @@ export default function Storefront() {
     if (initialized.current) localStorage.setItem('daybasket-cart', JSON.stringify(cart));
     checkoutKey.current = null;
   }, [cart, address, appliedCoupon, payment]);
-  useEffect(() => {
-    localStorage.setItem('daybasket-wishlist', JSON.stringify(saved));
-  }, [saved]);
   useEffect(() => {
     if (panel !== 'cart' || !cart.length) {
       setQuote(null);
@@ -209,18 +200,12 @@ export default function Storefront() {
   }
   function chooseCategory(id: string) {
     setCategory(id);
-    setOnlySaved(false);
     setSearch('');
     catalogueRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
-  function wishlist(id: string) {
-    setSaved((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
-    if (user) void request('/wishlist/' + id, 'POST').catch(() => {});
   }
   let visible = products.filter(
     (p) =>
       (category === 'all' || p.categoryId === category) &&
-      (!onlySaved || saved.includes(p.id)) &&
       `${p.name} ${p.brand} ${categories.find((c) => c.id === p.categoryId)?.name}`
         .toLowerCase()
         .includes(search.toLowerCase()),
@@ -409,7 +394,6 @@ export default function Storefront() {
               onChange={(e) => {
                 setSearch(e.target.value);
                 setCategory('all');
-                setOnlySaved(false);
               }}
             />
             <kbd>⌕</kbd>
@@ -421,17 +405,6 @@ export default function Storefront() {
             >
               <UserRound size={19} />
               <span>{user ? user.name.split(' ')[0] : 'Sign in'}</span>
-            </button>
-            <button
-              className="icon-button"
-              aria-label="View wishlist"
-              onClick={() => {
-                setOnlySaved((v) => !v);
-                setCategory('all');
-                catalogueRef.current?.scrollIntoView({ behavior: 'smooth' });
-              }}
-            >
-              <Heart size={19} />
             </button>
             <button className="basket-button" onClick={() => open('cart')}>
               <ShoppingBasket size={18} />
@@ -469,20 +442,21 @@ export default function Storefront() {
           <div className="hero-main">
             <div className="hero-copy">
               <div className="eyebrow">
-                <span>✳</span> YOUR NEIGHBOURHOOD, DELIVERED
+                <span>✳</span> {homepage.heroEyebrow ?? 'THIS WEEK AT DAYBASKET'}
               </div>
-              <h1>
-                Everyday good.
-                <br />
-                At your <em>doorstep.</em>
-              </h1>
+              <h1>{homepage.heroTitle ?? 'Fresh picks. Great offers.'}</h1>
               <p>
-                Farm-fresh finds, pantry favourites,
-                <br />
-                and all the little things in between.
+                {homepage.heroDescription ??
+                  'Discover the latest offers on your everyday essentials.'}
               </p>
-              <button className="primary" onClick={() => chooseCategory('produce')}>
-                Fill your basket <ArrowUpRight size={14} />
+              <button
+                className="primary"
+                onClick={() => {
+                  setSort('discount');
+                  chooseCategory('all');
+                }}
+              >
+                {homepage.heroButton ?? 'Shop offers'} <ArrowUpRight size={14} />
               </button>
               <div className="hero-dots" aria-hidden="true">
                 <i />
@@ -498,39 +472,17 @@ export default function Storefront() {
             />
           </div>
           <div className="hero-side">
-            <span className="eyebrow">THE SLOW MORNING CLUB</span>
-            <h2>
-              Better mornings
-              <br />
-              start <em>here.</em>
-            </h2>
-            <p>Breakfast favourites worth getting out of bed for.</p>
-            <button className="text-link" onClick={() => chooseCategory('breakfast')}>
-              Meet your morning <ArrowUpRight size={14} />
+            <span className="eyebrow">{homepage.sideEyebrow ?? 'MORE TO DISCOVER'}</span>
+            <h2>{homepage.sideTitle ?? 'Your daily essentials.'}</h2>
+            <p>{homepage.sideDescription ?? 'Find something good for every day.'}</p>
+            <button className="text-link" onClick={() => chooseCategory('all')}>
+              {homepage.sideButton ?? 'Explore the store'} <ArrowUpRight size={14} />
             </button>
             <img
               src={mediaUrl(homepage.breakfast || photo('photo-1517673400267-0251440c45dc', 400))}
               alt="Wholesome breakfast oats"
             />
           </div>
-        </section>
-        <section className="perks" aria-label="Our promises">
-          {[
-            [Leaf, 'Freshness comes first', 'Thoughtfully picked. Quality checked.'],
-            [ShieldCheck, 'Good prices. No surprises.', 'A little more value in every basket'],
-            [PackageCheck, 'Packed with a little care', 'From our neighbourhood to yours'],
-          ].map(([Icon, title, detail]) => {
-            const I = Icon as typeof Truck;
-            return (
-              <div className="perk" key={String(title)}>
-                <I />
-                <div>
-                  <b>{String(title)}</b>
-                  <small>{String(detail)}</small>
-                </div>
-              </div>
-            );
-          })}
         </section>
         <section className="shop-section">
           <div className="section-heading">
@@ -561,19 +513,13 @@ export default function Storefront() {
           <div className="section-heading">
             <div>
               <h2>
-                {onlySaved
-                  ? 'Your little favourites'
-                  : search
-                    ? `Finds for “${search}”`
-                    : category === 'all'
-                      ? 'Fresh picks for your everyday'
-                      : categories.find((c) => c.id === category)?.name}
+                {search
+                  ? `Finds for “${search}”`
+                  : category === 'all'
+                    ? 'Fresh picks for your everyday'
+                    : categories.find((c) => c.id === category)?.name}
               </h2>
-              <p>
-                {onlySaved
-                  ? 'Good things worth coming back for.'
-                  : 'The neighbourhood favourites. Always a good choice.'}
-              </p>
+              <p>The neighbourhood favourites. Always a good choice.</p>
             </div>
             <span className="text-link">
               {visible.length} fresh finds <Leaf size={13} />
@@ -583,11 +529,10 @@ export default function Storefront() {
             <button
               onClick={() => {
                 setCategory('all');
-                setOnlySaved(false);
               }}
               className={`filter-chip ${category === 'all' ? 'active' : ''}`}
             >
-              All favourites
+              All products
             </button>
             {categories.slice(0, 3).map((c) => (
               <button
@@ -632,14 +577,6 @@ export default function Storefront() {
                       </span>
                     </button>
                     <button
-                      className={`wish-button ${saved.includes(p.id) ? 'saved' : ''}`}
-                      aria-label={`Save ${p.name}`}
-                      aria-pressed={saved.includes(p.id)}
-                      onClick={() => wishlist(p.id)}
-                    >
-                      <Heart size={13} fill={saved.includes(p.id) ? 'currentColor' : 'none'} />
-                    </button>
-                    <button
                       className="product-name"
                       onClick={() => {
                         setSelected(p);
@@ -668,7 +605,6 @@ export default function Storefront() {
                   className="secondary"
                   onClick={() => {
                     setSearch('');
-                    setOnlySaved(false);
                     setCategory('all');
                   }}
                 >
@@ -738,15 +674,6 @@ export default function Storefront() {
           <Grid2X2 size={19} />
           Categories
         </button>
-        <button
-          onClick={() => {
-            setOnlySaved(true);
-            catalogueRef.current?.scrollIntoView({ behavior: 'smooth' });
-          }}
-        >
-          <Heart size={19} />
-          Favourites
-        </button>
         <button onClick={() => open('cart')}>
           <ShoppingBasket size={19} />
           Basket {count > 0 ? `(${count})` : ''}
@@ -809,7 +736,13 @@ export default function Storefront() {
             />
           </label>
           {formError && <ErrorNotice message={formError} />}
-          <button className="primary full" type="submit" disabled={busy || name.trim().length < 2 || !/^[6-9]\d{9}$/.test(phone) || password.length < 4}>
+          <button
+            className="primary full"
+            type="submit"
+            disabled={
+              busy || name.trim().length < 2 || !/^[6-9]\d{9}$/.test(phone) || password.length < 4
+            }
+          >
             {busy ? 'Signing in…' : 'Continue'} <ArrowRight size={15} />
           </button>
         </form>
@@ -825,7 +758,8 @@ export default function Storefront() {
           you choose the button below.
         </p>
         <div className="demo-note">
-          Save your complete address below. Delivery availability is checked separately at checkout.
+          We accept delivery addresses across India. Add your complete address and six-digit PIN
+          code.
         </div>
         <button className="secondary" onClick={locate} disabled={busy}>
           <Navigation size={15} />
@@ -865,7 +799,12 @@ export default function Storefront() {
           <div className="form-grid">
             <label className="field">
               City
-              <input name="city" defaultValue={address?.city || ''} placeholder="Your city" required />
+              <input
+                name="city"
+                defaultValue={address?.city || ''}
+                placeholder="Your city"
+                required
+              />
             </label>
             <label className="field">
               PIN code
@@ -878,7 +817,15 @@ export default function Storefront() {
               />
             </label>
           </div>
-          <label className="field">State<input name="state" defaultValue={address?.state || ''} placeholder="Your state" required /></label>
+          <label className="field">
+            State
+            <input
+              name="state"
+              defaultValue={address?.state || ''}
+              placeholder="Your state"
+              required
+            />
+          </label>
           {geoLabel && <p className="address-hint">{geoLabel}</p>}
           <label className="field">
             Delivery instructions (optional)

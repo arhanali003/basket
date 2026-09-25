@@ -10,9 +10,9 @@ export default function Policies() {
       </p>
       <h2>Delivery & cancellation</h2>
       <p>
-        The demo serves an 8 km radius around Indiranagar. Delivery availability is confirmed at checkout,
-        subject to real store capacity. Orders can be cancelled before picking begins. Cancellation
-        restores stock and marks test payments as mock-refunded.
+        Delivery addresses across India are accepted, subject to stock and fulfilment capacity.
+        Orders can be cancelled before picking begins. Cancellation restores stock and marks test
+        payments as mock-refunded.
       </p>
       <h2>Payments & returns</h2>
       <p>
