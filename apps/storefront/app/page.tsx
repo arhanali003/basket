@@ -62,7 +62,7 @@ export default function Storefront() {
   const [password, setPassword] = useState('');
   const [address, setAddress] = useState<Address | null>(null),
     [geo, setGeo] = useState({ latitude: 12.9784, longitude: 77.6408 }),
-    [geoLabel, setGeoLabel] = useState('Development pin: Indiranagar store area'),
+    [geoLabel, setGeoLabel] = useState(''),
     [quote, setQuote] = useState<Quote | null>(null),
     [coupon, setCoupon] = useState(''),
     [appliedCoupon, setAppliedCoupon] = useState(''),
@@ -296,8 +296,8 @@ export default function Storefront() {
         state: f.get('state'),
         pincode: f.get('pincode'),
         instructions: f.get('instructions'),
-        latitude: Number(f.get('latitude')),
-        longitude: Number(f.get('longitude')),
+        latitude: geo.latitude,
+        longitude: geo.longitude,
       });
       setAddress(a);
       setPanel(cart.length ? 'cart' : null);
@@ -879,31 +879,7 @@ export default function Storefront() {
             </label>
           </div>
           <label className="field">State<input name="state" defaultValue={address?.state || ''} placeholder="Your state" required /></label>
-          <p className="address-hint">{geoLabel}</p>
-          <div className="form-grid">
-            <label className="field">
-              Entrance latitude
-              <input
-                name="latitude"
-                type="number"
-                step="any"
-                value={geo.latitude}
-                onChange={(e) => setGeo({ ...geo, latitude: Number(e.target.value) })}
-                required
-              />
-            </label>
-            <label className="field">
-              Entrance longitude
-              <input
-                name="longitude"
-                type="number"
-                step="any"
-                value={geo.longitude}
-                onChange={(e) => setGeo({ ...geo, longitude: Number(e.target.value) })}
-                required
-              />
-            </label>
-          </div>
+          {geoLabel && <p className="address-hint">{geoLabel}</p>}
           <label className="field">
             Delivery instructions (optional)
             <input

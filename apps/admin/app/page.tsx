@@ -63,6 +63,9 @@ export default function Admin() {
     [driver, setDriver] = useState(''),
     [notice, setNotice] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [confirmDelivery, setConfirmDelivery] = useState<Order | null>(null);
+  const [confirmationCode, setConfirmationCode] = useState('');
+  const [deliveryError, setDeliveryError] = useState('');
   const [homepage, setHomepage] = useState<HomepageImages>({});
   const [deleting, setDeleting] = useState<Product | null>(null);
   useEffect(() => {
@@ -1041,8 +1044,9 @@ export default function Admin() {
               )}
               {['out_for_delivery', 'arriving'].includes(selected.status) && (
                 <button className="primary" disabled={busy} onClick={() => {
-                  const code = window.prompt('Enter the delivery code provided by the customer');
-                  if (code) void mutate(`/orders/${selected.id}/status`, 'PATCH', { status: 'delivered', code });
+                  setConfirmationCode('');
+                  setDeliveryError('');
+                  setConfirmDelivery(selected);
                 }}>Mark delivered successfully</button>
               )}
               {['placed', 'accepted'].includes(selected.status) && (
@@ -1082,6 +1086,33 @@ export default function Admin() {
             {error && <ErrorNotice message={error} />}
           </div>
         )}
+      </Modal>
+      <Modal open={!!confirmDelivery} onClose={() => { if (!busy) setConfirmDelivery(null); }} title="Confirm delivery">
+        <form onSubmit={async (event) => {
+          event.preventDefault();
+          if (!confirmDelivery || busy) return;
+          setBusy(true);
+          setDeliveryError('');
+          try {
+            await request(`/orders/${confirmDelivery.id}/status`, 'PATCH', { status: 'delivered', code: confirmationCode.trim() });
+            setConfirmDelivery(null);
+            setNotice('Delivery confirmed successfully');
+            await refresh();
+            if (selected) setSelected(await api.order(selected.id));
+          } catch (error) {
+            setDeliveryError(error instanceof Error ? error.message : 'Unable to confirm delivery. Please try again.');
+          } finally { setBusy(false); }
+        }}>
+          <p className="muted">Ask the customer for their delivery code to confirm this order has arrived.</p>
+          <label className="field">Delivery verification code
+            <input autoFocus aria-label="Delivery verification code" type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]+" maxLength={8} required value={confirmationCode} onChange={(event) => setConfirmationCode(event.target.value.replace(/\D/g, ''))} placeholder="Enter customer’s code" disabled={busy} />
+          </label>
+          {deliveryError && <ErrorNotice message={deliveryError} />}
+          <div className="order-actions">
+            <button className="secondary" type="button" disabled={busy} onClick={() => setConfirmDelivery(null)}>Cancel</button>
+            <button className="primary" type="submit" disabled={busy || !confirmationCode.trim()}>{busy ? 'Verifying…' : 'Verify & confirm delivery'} <ShieldCheck size={15} /></button>
+          </div>
+        </form>
       </Modal>
     </div>
   );
