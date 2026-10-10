@@ -13,6 +13,7 @@ import { ApiController } from './controller';
 import { Database } from './database';
 import { Auth } from './auth';
 import { initializeTracking } from './realtime';
+import { rateLimitBucket } from './rate-limit';
 @Module({ controllers: [ApiController], providers: [Database, Auth] })
 class AppModule {}
 @Catch()
@@ -64,13 +65,16 @@ async function bootstrap() {
     const origin = req.headers.origin;
     if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && origin && !origins.includes(origin))
       return res.status(403).json({ message: 'Origin not allowed' });
-    const key = (req.ip || 'local') + (req.path.includes('/auth/') ? 'auth' : 'api');
+    const bucket = rateLimitBucket(req.method, req.path);
+    const key = `${req.ip || 'local'}:${bucket}`;
     const now = Date.now();
     if (rates.size > 10000) for (const [k, v] of rates) if (v.reset < now) rates.delete(k);
     const rate = rates.get(key);
     if (!rate || rate.reset < now) rates.set(key, { count: 1, reset: now + 60000 });
-    else if (++rate.count > (key.endsWith('auth') ? 30 : 600))
+    else if (++rate.count > (bucket === 'auth' ? 30 : 600)) {
+      res.setHeader('Retry-After', Math.max(1, Math.ceil((rate.reset - now) / 1000)));
       return res.status(429).json({ message: 'Too many requests. Try again shortly.' });
+    }
     next();
   });
   app.useGlobalFilters(new Errors());

@@ -48,4 +48,7 @@ sign-in needs the private Firebase configuration. The storefront browser checks
 use its production build. The local admin demo password remains
 `daybasket-local-only`; this login is disabled in production.
 
-These changes are local and have not been pushed or deployed to Vercel.
+These changes were deployed to the existing storefront, admin and API Vercel
+projects from commit `c568c0c` on 10 October 2026. Live storefront search, API
+readiness and the admin login page were checked. See `CI-REPAIR.md` for the
+subsequent full-suite and browser-reliability corrections.

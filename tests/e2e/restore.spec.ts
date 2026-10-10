@@ -83,7 +83,7 @@ test.beforeEach(async ({ page }) => {
 async function openStore(page: Page) {
   await page.goto('/');
   await expect(
-    page.getByRole('button', { name: `Add ${product.name}`, exact: true }),
+    page.getByRole('button', { name: `View ${product.name}`, exact: true }),
   ).toBeVisible();
   await expect(page.locator('.site-header')).toHaveCSS('position', 'sticky');
   await expect
@@ -120,6 +120,44 @@ async function removeStylesheets(page: Page) {
     return hrefs;
   });
 }
+
+test('a saved basket survives initial hydration and a normal reload', async ({ page }) => {
+  await page.addInitScript(
+    ({ id }) => {
+      if (!sessionStorage.getItem('basket-fixture')) {
+        localStorage.setItem('daybasket-cart', JSON.stringify([{ productId: id, quantity: 2 }]));
+        sessionStorage.setItem('basket-fixture', 'ready');
+      }
+    },
+    { id: product.id },
+  );
+  await openStore(page);
+  await expect(page.locator('.basket-button > span')).toHaveText('2');
+  await page.reload();
+  await expect(page.locator('.basket-button > span')).toHaveText('2');
+  expect(
+    await page.evaluate(() => JSON.parse(localStorage.getItem('daybasket-cart') || '[]')),
+  ).toEqual([{ productId: product.id, quantity: 2 }]);
+});
+
+test('blocked basket storage does not crash shopping', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.addInitScript(() => {
+    const original = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key, value) {
+      if (key === 'daybasket-cart')
+        throw new DOMException('Storage unavailable', 'QuotaExceededError');
+      return original.call(this, key, value);
+    };
+  });
+  await openStore(page);
+  await page.getByRole('button', { name: `Add ${product.name}`, exact: true }).click();
+  await expect(page.locator('.basket-button > span')).toHaveText('1');
+  await page.locator('.basket-button').click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  expect(errors).toEqual([]);
+});
 
 test('Gupta Mart fits a phone and healthy resumes preserve the current basket and search', async ({
   page,

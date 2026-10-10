@@ -43,21 +43,24 @@ test('customer storefront: search, cart, login, location, mock checkout and trac
   page,
 }) => {
   await page.goto('/');
+  // The owner can edit the offer copy; assert the banner structure, not old seed text.
   await expect(
-    page.getByRole('heading', { name: 'Everyday good. At your doorstep.' }),
+    page.getByRole('region', { name: 'Weekly specials' }).getByRole('heading', { level: 1 }),
   ).toBeVisible();
   await page.getByRole('button', { name: 'Add Farm-fresh avocados', exact: true }).click();
   await page.getByRole('button', { name: 'My basket' }).click();
   await expect(page.getByRole('heading', { name: 'Your basket · 1 items' })).toBeVisible();
   await page.getByRole('button', { name: 'Sign in to continue' }).click();
   await page.getByLabel('Your name').fill('Demo Neighbour');
-  await page.getByLabel('Mobile number', { exact: true }).fill(uniquePhone());
-  await page.getByRole('button', { name: 'Send verification code' }).click();
-  await page.getByLabel('Verification code').fill('123456');
-  await page.getByRole('button', { name: 'Verify & continue' }).click();
+  await page.getByLabel('Phone number', { exact: true }).fill(uniquePhone());
+  await page.getByLabel('Password', { exact: true }).fill('checkout-test-password');
+  await page.getByRole('button', { name: 'Continue', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Where’s your little corner?' })).toBeVisible();
   await page.getByLabel('Flat / house, building & street').fill('204 Maple House, 12th Main Road');
-  await page.getByRole('button', { name: 'Check availability & save' }).click();
+  await page.getByLabel('City', { exact: true }).fill('Bengaluru');
+  await page.getByLabel('PIN code', { exact: true }).fill('560038');
+  await page.getByLabel('State', { exact: true }).fill('Karnataka');
+  await page.getByRole('button', { name: 'Save address', exact: true }).click();
   await page.getByRole('radio', { name: /Test online payment/ }).check();
   await page.getByRole('button', { name: /Place order ·/ }).click();
   await expect(page.getByRole('heading', { name: 'Your basket’s little journey' })).toBeVisible();

@@ -45,6 +45,7 @@ export default function Storefront() {
     [error, setError] = useState('');
   const [user, setUser] = useState<User | null>(null),
     [cart, setCart] = useState<CartLine[]>([]),
+    [cartReady, setCartReady] = useState(false),
     [category, setCategory] = useState('all'),
     [search, setSearch] = useState(''),
     [sort, setSort] = useState('popular');
@@ -70,8 +71,7 @@ export default function Storefront() {
   const [searchFocused, setSearchFocused] = useState(false);
   const [activeSuggestion, setActiveSuggestion] = useState(-1);
   const searchInput = useRef<HTMLInputElement>(null);
-  const initialized = useRef(false),
-    toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null),
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null),
     checkoutKey = useRef<string | null>(null),
     catalogueRef = useRef<HTMLElement>(null);
   function message(text: string) {
@@ -115,13 +115,18 @@ export default function Storefront() {
         setCart(
           c.filter(
             (i) =>
-              typeof i.productId === 'string' && Number.isInteger(i.quantity) && i.quantity > 0,
+              i &&
+              typeof i.productId === 'string' &&
+              Number.isInteger(i.quantity) &&
+              i.quantity > 0,
           ),
         );
     } catch {
-      /* Ignore malformed local development storage. */
+      /* Browser storage may be unavailable or contain malformed data. */
     }
-    initialized.current = true;
+    // Wait for restored state to commit before persisting. A ref would allow the
+    // initial empty render (and Strict Mode's replay) to overwrite the saved cart.
+    setCartReady(true);
     api
       .me()
       .then(async (u) => {
@@ -148,9 +153,15 @@ export default function Storefront() {
     };
   }, []);
   useEffect(() => {
-    if (initialized.current) localStorage.setItem('daybasket-cart', JSON.stringify(cart));
+    if (cartReady) {
+      try {
+        localStorage.setItem('daybasket-cart', JSON.stringify(cart));
+      } catch {
+        // Keep shopping usable when private browsing or a quota blocks storage.
+      }
+    }
     checkoutKey.current = null;
-  }, [cart, address, appliedCoupon, payment]);
+  }, [cart, cartReady, address, appliedCoupon, payment]);
   useEffect(() => {
     if (panel !== 'cart' || !cart.length) {
       setQuote(null);

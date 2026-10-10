@@ -32,5 +32,6 @@ preventive and is not evidence that the worker caused the reported failure.
 
 The browser tests simulate resource loss and lifecycle events. Physical-phone
 browser/OS eviction has not been reproduced; verify the original scenario on
-the affected device after publishing. Changes are local; no GitHub push,
-production database change or Vercel deployment was performed.
+the affected device. These changes were deployed to the existing Vercel projects
+from commit `c568c0c` on 10 October 2026. See `CI-REPAIR.md` for subsequent basket
+persistence and automated-check corrections.

@@ -40,12 +40,12 @@ test('owner uploads gallery photos, chooses cover, publishes homepage photos and
   await expect(page.locator('.gallery-main')).toHaveAttribute('src', /\/media\//);
   await page.goto('http://localhost:3001');
   const originalHomepage = await (await request.get(base + '/homepage')).json();
-  await page.getByRole('button', { name: 'Homepage photos' }).click();
+  await page.getByRole('button', { name: 'Homepage offers', exact: true }).click();
   await page
     .getByLabel('Main banner', { exact: true })
     .setInputFiles({ name: 'banner.png', mimeType: 'image/png', buffer: pixel });
   await expect(page.locator('.photo-previews img')).toHaveCount(1);
-  await page.getByRole('button', { name: 'Save homepage photos' }).click();
+  await page.getByRole('button', { name: 'Save homepage offers', exact: true }).click();
   await expect(page.getByText('Changes saved', { exact: true })).toBeVisible();
   await page.goto('http://localhost:3000');
   await expect(page.locator('.hero-image')).toHaveAttribute('src', /\/api\/v1\/media\//);
@@ -100,16 +100,23 @@ test('media and homepage mutations require owner; invalid media is rejected', as
   expect(await media.body()).toEqual(pixel);
 });
 
-test('customer login asks for a name and offers only Google', async ({ page }) => {
+test('customer login validates name, phone and password without OTP or Google', async ({
+  page,
+}) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
-  const google = page.getByRole('button', { name: 'Continue with Google', exact: true });
-  await expect(google).toBeVisible();
-  await expect(google).toBeDisabled();
+  const submit = page.getByRole('button', { name: 'Continue', exact: true });
+  await expect(submit).toBeVisible();
+  await expect(submit).toBeDisabled();
   await page.getByLabel('Your name', { exact: true }).fill('  ');
-  await expect(google).toBeDisabled();
+  await expect(submit).toBeDisabled();
   await page.getByLabel('Your name', { exact: true }).fill('Asha Kumar');
-  await expect(google).toBeEnabled();
-  await expect(page.getByLabel('Mobile number', { exact: true })).toHaveCount(0);
+  await expect(submit).toBeDisabled();
+  await page.getByLabel('Phone number', { exact: true }).fill('9876543210');
+  await page.getByLabel('Password', { exact: true }).fill('test-password');
+  await expect(submit).toBeEnabled();
+  await page.getByLabel('Phone number', { exact: true }).fill('123');
+  await expect(submit).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Continue with Google' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Send verification code' })).toHaveCount(0);
 });
