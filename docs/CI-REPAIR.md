@@ -12,7 +12,9 @@ Frontend type checks run `next typegen` before TypeScript so a fresh checkout
 does not depend on route declarations left behind by a previous local build.
 Playwright now manages and waits for all four local servers in CI, fails if a
 port is already occupied, and rejects accidentally focused tests. The storefront
-uses its production build; admin and delivery use development-only demo sign-in.
+and staff apps use their production builds. Staff tests establish sessions through
+the development-only API in the disposable environment; production mock sign-in
+remains disabled.
 
 ## Additional issues covered
 
@@ -27,6 +29,11 @@ uses its production build; admin and delivery use development-only demo sign-in.
   URLs, preventing rapid deployments or development asset timestamps from
   bypassing the existing per-version reload guard.
 - Regression tests cover saved baskets, blocked storage and rate-limit routing.
+- Ordinary admin visits skip Google's redirect resolver unless a Google login
+  was started in that tab, allowing existing backend sessions to restore without
+  an unnecessary identity-provider request. Redirect verification remains required.
+- Returning to a visible tab resets failed-image retry cooldowns so an earlier
+  automatic retry cannot prevent recovery after the connection becomes available.
 - The populated-category UI test uses disposable categories and a real product
   instead of intercepted catalogue responses, and verifies the product's new
   category through the API. Only generated fixtures are moved or archived.
@@ -34,7 +41,7 @@ uses its production build; admin and delivery use development-only demo sign-in.
 ## Reproduce safely
 
 Local verification passed in a separate checkout with disposable SQLite data:
-lint, all eight package type checks, 78 unit tests, all four production builds
+lint, all eight package type checks, 80 unit tests, all four production builds
 and all 30 browser/API tests. This includes checkout, authorization boundaries,
 stock contention, category/product edits, photo uploads, search and resource
 recovery. GitHub and Vercel independently run their checks on the pushed commit.

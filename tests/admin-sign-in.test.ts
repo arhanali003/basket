@@ -81,6 +81,7 @@ test('uses the admin origin and session persistence for the redirect', async () 
   expect(memory.get('daybasket-owner-sign-in')).toBe('1');
 });
 test('exchanges a returned Google credential once even with repeated startup calls', async () => {
+  memory.set('daybasket-owner-sign-in', '1');
   mockResult.mockResolvedValue({
     user: {
       reload: jest.fn().mockResolvedValue(undefined),
@@ -100,6 +101,7 @@ test('exchanges a returned Google credential once even with repeated startup cal
   expect(mockSignOut).toHaveBeenCalledTimes(1);
 });
 test('keeps backend access rejection visible and clears temporary identity', async () => {
+  memory.set('daybasket-owner-sign-in', '1');
   mockResult.mockResolvedValue({
     user: {
       reload: jest.fn().mockResolvedValue(undefined),
@@ -123,6 +125,23 @@ test('an ordinary page visit has no redirect error or account provisioning', asy
   const { finishOwnerSignIn } = await import('../apps/admin/app/sign-in');
   await expect(finishOwnerSignIn()).resolves.toBeNull();
   expect(mockRequest).not.toHaveBeenCalled();
+  expect(mockInitialize).not.toHaveBeenCalled();
+  expect(mockResult).not.toHaveBeenCalled();
+});
+test('session restoration does not require Firebase configuration on an ordinary visit', async () => {
+  delete process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+  delete process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+  const { finishOwnerSignIn } = await import('../apps/admin/app/sign-in');
+  await expect(finishOwnerSignIn()).resolves.toBeNull();
+  expect(mockInitialize).not.toHaveBeenCalled();
+});
+test('blocked browser storage still allows normal backend session restoration', async () => {
+  sessionStorage.getItem = () => {
+    throw new Error('blocked');
+  };
+  const { finishOwnerSignIn } = await import('../apps/admin/app/sign-in');
+  await expect(finishOwnerSignIn()).resolves.toBeNull();
+  expect(mockRequest).not.toHaveBeenCalled();
 });
 test('blocked session storage is reported before leaving the page', async () => {
   sessionStorage.setItem = () => {
@@ -134,6 +153,7 @@ test('blocked session storage is reported before leaving the page', async () => 
 });
 
 test('passes Google proof to the backend when Firebase has no primary email', async () => {
+  memory.set('daybasket-owner-sign-in', '1');
   const user = {
     email: null,
     emailVerified: false,

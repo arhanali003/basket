@@ -43,10 +43,10 @@ every active product into the browser.
   suggestions, custom categories, and the earlier asset-recovery behavior.
 - All four production builds pass; desktop and mobile previews were inspected.
 
-The admin UI is tested locally in development mode because production Google
-sign-in needs the private Firebase configuration. The storefront browser checks
-use its production build. The local admin demo password remains
-`daybasket-local-only`; this login is disabled in production.
+The follow-up verification uses production builds of all interfaces, with admin
+sessions created only through the disposable local mock API. Production Google
+sign-in still requires the owner's real account. The local admin demo password
+remains `daybasket-local-only`; this login is disabled in production.
 
 These changes were deployed to the existing storefront, admin and API Vercel
 projects from commit `c568c0c` on 10 October 2026. Live storefront search, API

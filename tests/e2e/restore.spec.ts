@@ -286,12 +286,20 @@ test('a failed photo is retried on resume while healthy images and the document 
       }),
     )
     .toBe(true);
-  const beforeResume = attempts;
   const healthyImage = page.locator('.hero-side img');
   await expect
     .poll(() => healthyImage.evaluate((image) => (image as HTMLImageElement).naturalWidth))
     .toBeGreaterThan(0);
   const healthySource = await healthyImage.getAttribute('src');
+  // A failed retry just before the network recovers must not suppress the next
+  // tab-resume attempt for the normal 30-second scan cooldown.
+  const beforeFailedResume = attempts;
+  await resume(page);
+  await expect.poll(() => attempts).toBeGreaterThan(beforeFailedResume);
+  await expect
+    .poll(() => page.locator('.hero-image').evaluate((image) => (image as HTMLImageElement).complete))
+    .toBe(true);
+  const beforeResume = attempts;
   available = true;
 
   await resume(page);

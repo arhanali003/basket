@@ -128,6 +128,7 @@ export function AssetRecovery() {
     }
 
     function reconnect() {
+      if (document.hidden) return;
       imageAttempts = new WeakMap();
       schedule();
     }
@@ -135,16 +136,16 @@ export function AssetRecovery() {
     rememberStyles();
     if (document.readyState === 'complete') schedule();
     window.addEventListener('load', schedule);
-    window.addEventListener('pageshow', schedule);
+    window.addEventListener('pageshow', reconnect);
     window.addEventListener('online', reconnect);
-    document.addEventListener('visibilitychange', schedule);
+    document.addEventListener('visibilitychange', reconnect);
     return () => {
       disposed = true;
       clearTimeout(timer);
       window.removeEventListener('load', schedule);
-      window.removeEventListener('pageshow', schedule);
+      window.removeEventListener('pageshow', reconnect);
       window.removeEventListener('online', reconnect);
-      document.removeEventListener('visibilitychange', schedule);
+      document.removeEventListener('visibilitychange', reconnect);
     };
   }, []);
 

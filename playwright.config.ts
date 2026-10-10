@@ -15,8 +15,8 @@ export default defineConfig({
           reuseExistingServer: false,
         },
         ...['storefront', 'admin', 'delivery'].map((app, index) => ({
-          // Exercise the storefront's deployed assets. Staff UI uses local-only demo sign-in.
-          command: `node node_modules/next/dist/bin/next ${app === 'storefront' ? 'start' : 'dev'} apps/${app} ${app === 'storefront' ? '' : '--webpack'} --port ${3000 + index}`,
+          // Exercise deployed assets; staff sessions come from the local test API.
+          command: `node node_modules/next/dist/bin/next start apps/${app} --port ${3000 + index}`,
           url: `http://localhost:${3000 + index}`,
           timeout: 120000,
           reuseExistingServer: false,

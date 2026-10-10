@@ -9,9 +9,14 @@ test('owner uploads gallery photos, chooses cover, publishes homepage photos and
   page,
   request,
 }) => {
+  expect(
+    (
+      await page.request.post(base + '/auth/staff', {
+        data: { role: 'super_admin', password: 'daybasket-local-only' },
+      })
+    ).ok(),
+  ).toBeTruthy();
   await page.goto('http://localhost:3001');
-  await page.getByLabel('Store password').fill('daybasket-local-only');
-  await page.getByRole('button', { name: 'Open store studio' }).click();
   await page.getByRole('button', { name: 'Products', exact: true }).click();
   await page.getByRole('button', { name: 'Add product', exact: true }).click();
   const slug = 'gallery-check-' + Date.now();

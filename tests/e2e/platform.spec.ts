@@ -71,9 +71,14 @@ test('customer storefront: search, cart, login, location, mock checkout and trac
   await expect(page.locator('.product-card')).toHaveCount(1);
 });
 test('admin can create catalogue products', async ({ page }) => {
+  expect(
+    (
+      await page.request.post(base + '/auth/staff', {
+        data: { role: 'super_admin', password: 'daybasket-local-only' },
+      })
+    ).ok(),
+  ).toBeTruthy();
   await page.goto('http://localhost:3001');
-  await page.getByLabel('Store password').fill('daybasket-local-only');
-  await page.getByRole('button', { name: 'Open store studio' }).click();
   await page.getByRole('button', { name: 'Products', exact: true }).click();
   await page.getByRole('button', { name: 'Add product', exact: true }).click();
   const slug = 'test-apples-' + Date.now();

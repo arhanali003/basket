@@ -82,6 +82,14 @@ export function finishOwnerSignIn(): Promise<User | null> {
 }
 
 async function completeRedirect(): Promise<User | null> {
+  // Ordinary visits restore the backend session directly. Do not initialize
+  // Google's redirect resolver (or wait on its iframe) without a pending login.
+  try {
+    if (!sessionStorage.getItem(pendingKey)) return null;
+  } catch {
+    // Existing HttpOnly sessions still work when browser storage is restricted.
+    return null;
+  }
   const auth = prepareAdminAuth();
   try {
     const result = await getRedirectResult(auth);
