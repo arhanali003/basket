@@ -80,7 +80,7 @@ async function bootstrap() {
     SwaggerModule.createDocument(
       app,
       new DocumentBuilder()
-        .setTitle('Daybasket API')
+        .setTitle('Gupta Mart API')
         .setVersion('1')
         .addCookieAuth('db_session')
         .build(),
@@ -88,7 +88,7 @@ async function bootstrap() {
   );
   await app.listen(Number(process.env.PORT) || 4000, '0.0.0.0');
   initializeTracking(app.getHttpServer(), app.get(Auth), app.get(Database), origins);
-  console.log('Daybasket API: http://localhost:4000/api/docs');
+  console.log('Gupta Mart API: http://localhost:4000/api/docs');
 }
 bootstrap().catch((e) => {
   console.error(e instanceof Error ? e.message : 'API startup failed');

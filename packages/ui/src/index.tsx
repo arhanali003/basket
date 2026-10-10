@@ -4,11 +4,31 @@ import { ArrowUpRight, ShoppingBasket, X, LoaderCircle, Leaf, ArrowRight } from 
 import { useState, type ReactNode } from 'react';
 export function Logo({ dark = false }: { dark?: boolean }) {
   return (
-    <a href="/" className={`logo ${dark ? 'logo-light' : ''}`} aria-label="Daybasket home">
-      <span className="logo-icon">
-        <ShoppingBasket size={24} />
+    <a href="/" className={`logo ${dark ? 'logo-light' : ''}`} aria-label="Gupta Mart home">
+      <span className="logo-icon" aria-hidden="true">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+          <rect width="64" height="64" rx="17" fill="#285643" />
+          <path
+            d="M24 25v-6a8 8 0 0 1 16 0v6"
+            stroke="#faf9f5"
+            strokeWidth="3.5"
+            strokeLinecap="round"
+          />
+          <path d="M17 24h30l3 25a5 5 0 0 1-5 6H19a5 5 0 0 1-5-6l3-25Z" fill="#faf9f5" />
+          <path
+            d="M39 34a9 9 0 1 0 1 12v-6h-8"
+            stroke="#285643"
+            strokeWidth="3.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path d="M40 19C39 11 44 7 52 8c0 8-4 12-12 11Z" fill="#e8743d" />
+        </svg>
       </span>
-      daybasket<span className="logo-dot">.</span>
+      <span className="logo-wordmark">
+        <span>Gupta</span>
+        <span className="logo-mart">Mart</span>
+      </span>
     </a>
   );
 }

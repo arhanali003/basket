@@ -5,7 +5,7 @@ export default function Policies() {
       <Logo />
       <h1>A little clarity.</h1>
       <p>
-        This is a development store. Daybasket, its Bengaluru operating area, contact details and
+        This is a development store. Gupta Mart, its Bengaluru operating area, contact details and
         business policies are placeholders. Test orders do not trigger a real delivery.
       </p>
       <h2>Delivery & cancellation</h2>

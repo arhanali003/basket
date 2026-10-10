@@ -250,6 +250,52 @@
   max-width: 180px;
   font-size: 11px;
 }
+.category-toolbar {
+  flex-wrap: wrap;
+}
+.category-toolbar .primary {
+  margin-left: auto;
+  font-size: 11px;
+}
+.category-table .table-product img {
+  object-fit: contain;
+  border-radius: 10px;
+}
+.category-table .row-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 0;
+}
+.category-table .row-actions .category-delete {
+  color: #a52a2a;
+}
+.category-colour {
+  display: inline-block;
+  width: 25px;
+  height: 25px;
+  border: 1px solid #0002;
+  border-radius: 50%;
+}
+.category-help {
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--muted);
+  margin: 16px 0;
+}
+.category-form {
+  display: grid;
+  gap: 18px;
+}
+.category-form > p {
+  font-size: 13px;
+  line-height: 1.7;
+}
+.category-colour-field input {
+  width: 72px;
+  height: 44px;
+  padding: 4px;
+}
 .login-page {
   min-height: 100vh;
   display: grid;

@@ -1,5 +1,6 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { normalizeSearch, searchProducts } from '@daybasket/types/src/search';
 import {
   ArrowRight,
   ArrowUpRight,
@@ -66,6 +67,9 @@ export default function Storefront() {
     [tracking, setTracking] = useState<(Order & { deliveryCode?: string }) | null>(null),
     [live, setLive] = useState(false);
   const [homepage, setHomepage] = useState<HomepageImages>({});
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [activeSuggestion, setActiveSuggestion] = useState(-1);
+  const searchInput = useRef<HTMLInputElement>(null);
   const initialized = useRef(false),
     toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null),
     checkoutKey = useRef<string | null>(null),
@@ -79,17 +83,23 @@ export default function Storefront() {
     setFormError('');
     setPanel(next);
   }
-  async function load() {
-    setLoading(true);
-    setError('');
+  async function load(quiet = false) {
+    if (!quiet) {
+      setLoading(true);
+      setError('');
+    }
     try {
       const d = await api.catalogue();
       setProducts(d.products);
       setCategories(d.categories);
+      setError('');
+      setCategory((current) =>
+        current === 'all' || d.categories.some((c) => c.id === current) ? current : 'all',
+      );
     } catch (e) {
-      setError((e as Error).message);
+      if (!quiet) setError((e as Error).message);
     } finally {
-      setLoading(false);
+      if (!quiet) setLoading(false);
     }
   }
   useEffect(() => {
@@ -97,7 +107,8 @@ export default function Storefront() {
     request<HomepageImages>('/homepage')
       .then(setHomepage)
       .catch(() => {});
-    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+    if ('serviceWorker' in navigator)
+      navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).catch(() => {});
     try {
       const c = JSON.parse(localStorage.getItem('daybasket-cart') || '[]') as CartLine[];
       if (Array.isArray(c))
@@ -121,6 +132,20 @@ export default function Storefront() {
         if (serverCart.length) setCart(serverCart);
       })
       .catch(() => {});
+  }, []);
+  useEffect(() => {
+    let lastRefresh = 0;
+    const refreshCatalogue = () => {
+      if (document.hidden || !navigator.onLine || Date.now() - lastRefresh < 1000) return;
+      lastRefresh = Date.now();
+      void load(true);
+    };
+    document.addEventListener('visibilitychange', refreshCatalogue);
+    window.addEventListener('online', refreshCatalogue);
+    return () => {
+      document.removeEventListener('visibilitychange', refreshCatalogue);
+      window.removeEventListener('online', refreshCatalogue);
+    };
   }, []);
   useEffect(() => {
     if (initialized.current) localStorage.setItem('daybasket-cart', JSON.stringify(cart));
@@ -199,17 +224,25 @@ export default function Storefront() {
     if (delta > 0 && !existing) message(`${p.name} added to your basket`);
   }
   function chooseCategory(id: string) {
-    setCategory(id);
+    setCategory(categories.some((item) => item.id === id) ? id : 'all');
     setSearch('');
     catalogueRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
-  let visible = products.filter(
-    (p) =>
-      (category === 'all' || p.categoryId === category) &&
-      `${p.name} ${p.brand} ${categories.find((c) => c.id === p.categoryId)?.name}`
-        .toLowerCase()
-        .includes(search.toLowerCase()),
+  const searchActive = Boolean(normalizeSearch(search));
+  const matches = useMemo(
+    () => searchProducts(products, categories, search),
+    [products, categories, search],
   );
+  const suggestions = matches.products.slice(0, 5);
+  const showSuggestions =
+    searchFocused && searchActive && !loading && !error && suggestions.length > 0;
+  let visible = matches.products.filter((p) => category === 'all' || p.categoryId === category);
+  function selectSuggestion(product: Product) {
+    setSearchFocused(false);
+    setActiveSuggestion(-1);
+    setSelected(product);
+    open('product');
+  }
   if (sort === 'low') visible = [...visible].sort((a, b) => a.price - b.price);
   if (sort === 'discount')
     visible = [...visible].sort((a, b) => 1 - b.price / b.mrp - (1 - a.price / a.mrp));
@@ -385,19 +418,115 @@ export default function Storefront() {
             </span>
             <ChevronDown size={13} />
           </button>
-          <label className="search-box">
+          <form
+            className="search-box"
+            role="search"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (showSuggestions && activeSuggestion >= 0) {
+                selectSuggestion(suggestions[activeSuggestion]);
+                return;
+              }
+              setSearchFocused(false);
+              searchInput.current?.blur();
+              catalogueRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }}
+          >
             <Search size={18} />
             <input
+              ref={searchInput}
+              role="combobox"
+              aria-expanded={showSuggestions}
+              aria-controls={showSuggestions ? 'product-suggestions' : undefined}
+              aria-activedescendant={
+                showSuggestions && activeSuggestion >= 0
+                  ? `product-suggestion-${activeSuggestion}`
+                  : undefined
+              }
+              aria-autocomplete="list"
               aria-label="Search products"
+              maxLength={100}
+              autoComplete="off"
+              enterKeyHint="search"
               placeholder="Search for “fresh milk”"
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value);
                 setCategory('all');
+                setSort('popular');
+                setSearchFocused(true);
+                setActiveSuggestion(-1);
+              }}
+              onFocus={() => setSearchFocused(true)}
+              onBlur={() => {
+                setSearchFocused(false);
+                setActiveSuggestion(-1);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') {
+                  setSearchFocused(false);
+                  setActiveSuggestion(-1);
+                }
+                if (showSuggestions && ['ArrowDown', 'ArrowUp'].includes(event.key)) {
+                  event.preventDefault();
+                  setActiveSuggestion((current) =>
+                    event.key === 'ArrowDown'
+                      ? (current + 1) % suggestions.length
+                      : current < 0
+                        ? suggestions.length - 1
+                        : (current - 1 + suggestions.length) % suggestions.length,
+                  );
+                }
               }}
             />
-            <kbd>⌕</kbd>
-          </label>
+            {search && (
+              <button
+                type="button"
+                className="search-clear"
+                aria-label="Clear search"
+                onClick={() => {
+                  setSearch('');
+                  setCategory('all');
+                  setActiveSuggestion(-1);
+                  searchInput.current?.focus();
+                }}
+              >
+                <X size={16} />
+              </button>
+            )}
+            <button type="submit" className="search-submit" aria-label="Search catalogue">
+              <ArrowRight size={17} />
+            </button>
+            {showSuggestions && (
+              <ul
+                id="product-suggestions"
+                className="search-suggestions"
+                role="listbox"
+                aria-label="Product suggestions"
+              >
+                {suggestions.map((product, index) => (
+                  <li
+                    key={product.id}
+                    id={`product-suggestion-${index}`}
+                    role="option"
+                    aria-selected={activeSuggestion === index}
+                    className={activeSuggestion === index ? 'selected' : ''}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => selectSuggestion(product)}
+                  >
+                    <img src={mediaUrl(product.image)} alt="" />
+                    <span>
+                      <b>{product.name}</b>
+                      <small>
+                        {product.brand} · {product.unit}
+                      </small>
+                    </span>
+                    <strong>{money(product.price)}</strong>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </form>
           <div className="header-actions">
             <button
               className="account-button"
@@ -415,111 +544,121 @@ export default function Storefront() {
         </div>
         <nav className="navigation" aria-label="Store categories">
           <div className="nav-links">
-            {[
-              ['all', 'All categories'],
-              ['produce', 'Fresh produce'],
-              ['dairy', 'Dairy & bakery'],
-              ['pantry', 'Pantry staples'],
-              ['snacks', 'Snacks & drinks'],
-              ['care', 'Home & care'],
-            ].map(([id, label]) => (
-              <button
-                key={id}
-                onClick={() => chooseCategory(id)}
-                className={category === id ? 'active' : ''}
-              >
-                {label}
-                {id === 'all' && (
-                  <ChevronDown size={10} style={{ display: 'inline', marginLeft: 8 }} />
-                )}
-              </button>
-            ))}
+            {[['all', 'All categories'], ...categories.map((item) => [item.id, item.name])].map(
+              ([id, label]) => (
+                <button
+                  key={id}
+                  onClick={() => chooseCategory(id)}
+                  className={category === id ? 'active' : ''}
+                >
+                  {label}
+                  {id === 'all' && (
+                    <ChevronDown size={10} style={{ display: 'inline', marginLeft: 8 }} />
+                  )}
+                </button>
+              ),
+            )}
           </div>
         </nav>
       </header>
       <main className="store-main">
-        <section className="hero-grid" aria-label="Weekly specials">
-          <div className="hero-main">
-            <div className="hero-copy">
-              <div className="eyebrow">
-                <span>✳</span> {homepage.heroEyebrow ?? 'THIS WEEK AT DAYBASKET'}
+        {!searchActive && (
+          <section className="hero-grid" aria-label="Weekly specials">
+            <div className="hero-main">
+              <div className="hero-copy">
+                <div className="eyebrow">
+                  <span>✳</span> {homepage.heroEyebrow ?? 'THIS WEEK AT GUPTA MART'}
+                </div>
+                <h1>{homepage.heroTitle ?? 'Fresh picks. Great offers.'}</h1>
+                <p>
+                  {homepage.heroDescription ??
+                    'Discover the latest offers on your everyday essentials.'}
+                </p>
+                <button
+                  className="primary"
+                  onClick={() => {
+                    setSort('discount');
+                    chooseCategory('all');
+                  }}
+                >
+                  {homepage.heroButton ?? 'Shop offers'} <ArrowUpRight size={14} />
+                </button>
+                <div className="hero-dots" aria-hidden="true">
+                  <i />
+                  <i />
+                  <i />
+                </div>
               </div>
-              <h1>{homepage.heroTitle ?? 'Fresh picks. Great offers.'}</h1>
-              <p>
-                {homepage.heroDescription ??
-                  'Discover the latest offers on your everyday essentials.'}
-              </p>
-              <button
-                className="primary"
-                onClick={() => {
-                  setSort('discount');
-                  chooseCategory('all');
-                }}
-              >
-                {homepage.heroButton ?? 'Shop offers'} <ArrowUpRight size={14} />
+              <img
+                className="hero-image"
+                src={mediaUrl(homepage.hero || photo('photo-1542838132-92c53300491e'))}
+                alt="Fresh finds from our store"
+                fetchPriority="high"
+              />
+            </div>
+            <div className="hero-side">
+              <span className="eyebrow">{homepage.sideEyebrow ?? 'MORE TO DISCOVER'}</span>
+              <h2>{homepage.sideTitle ?? 'Your daily essentials.'}</h2>
+              <p>{homepage.sideDescription ?? 'Find something good for every day.'}</p>
+              <button className="text-link" onClick={() => chooseCategory('all')}>
+                {homepage.sideButton ?? 'Explore the store'} <ArrowUpRight size={14} />
               </button>
-              <div className="hero-dots" aria-hidden="true">
-                <i />
-                <i />
-                <i />
+              <img
+                src={mediaUrl(homepage.breakfast || photo('photo-1517673400267-0251440c45dc', 400))}
+                alt="Wholesome breakfast oats"
+              />
+            </div>
+          </section>
+        )}
+        {!searchActive && (
+          <section className="shop-section">
+            <div className="section-heading">
+              <div>
+                <h2>Shop by category</h2>
+                <p>Choose what you need today.</p>
               </div>
-            </div>
-            <img
-              className="hero-image"
-              src={mediaUrl(homepage.hero || photo('photo-1542838132-92c53300491e'))}
-              alt="Fresh finds from our store"
-              fetchPriority="high"
-            />
-          </div>
-          <div className="hero-side">
-            <span className="eyebrow">{homepage.sideEyebrow ?? 'MORE TO DISCOVER'}</span>
-            <h2>{homepage.sideTitle ?? 'Your daily essentials.'}</h2>
-            <p>{homepage.sideDescription ?? 'Find something good for every day.'}</p>
-            <button className="text-link" onClick={() => chooseCategory('all')}>
-              {homepage.sideButton ?? 'Explore the store'} <ArrowUpRight size={14} />
-            </button>
-            <img
-              src={mediaUrl(homepage.breakfast || photo('photo-1517673400267-0251440c45dc', 400))}
-              alt="Wholesome breakfast oats"
-            />
-          </div>
-        </section>
-        <section className="shop-section">
-          <div className="section-heading">
-            <div>
-              <h2>Shop by category</h2>
-              <p>Choose what you need today.</p>
-            </div>
-            <button className="text-link" onClick={() => chooseCategory('all')}>
-              Explore all categories <ArrowRight size={13} />
-            </button>
-          </div>
-          <div className="category-grid">
-            {categories.map((c) => (
-              <button
-                key={c.id}
-                className={`category-tile ${category === c.id ? 'selected' : ''}`}
-                onClick={() => chooseCategory(c.id)}
-              >
-                <span className="category-picture" style={{ background: c.color }}>
-                  <img src={c.image} alt="" loading="lazy" />
-                </span>
-                <b>{c.name}</b>
+              <button className="text-link" onClick={() => chooseCategory('all')}>
+                Explore all categories <ArrowRight size={13} />
               </button>
-            ))}
-          </div>
-        </section>
-        <section className="shop-section" ref={catalogueRef} style={{ scrollMarginTop: 170 }}>
+            </div>
+            <div className="category-grid">
+              {categories.map((c) => (
+                <button
+                  key={c.id}
+                  className={`category-tile ${category === c.id ? 'selected' : ''}`}
+                  onClick={() => chooseCategory(c.id)}
+                >
+                  <span className="category-picture" style={{ background: c.color }}>
+                    <img src={mediaUrl(c.image)} alt="" loading="lazy" />
+                  </span>
+                  <b>{c.name}</b>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+        <section
+          className="shop-section"
+          id="catalogue"
+          ref={catalogueRef}
+          style={{ scrollMarginTop: 170 }}
+        >
           <div className="section-heading">
             <div>
               <h2>
-                {search
-                  ? `Finds for “${search}”`
+                {searchActive
+                  ? `Search results for “${search.trim()}”`
                   : category === 'all'
                     ? 'Fresh picks for your everyday'
                     : categories.find((c) => c.id === category)?.name}
               </h2>
-              <p>The neighbourhood favourites. Always a good choice.</p>
+              <p aria-live="polite" role="status">
+                {searchActive
+                  ? loading
+                    ? 'Searching the catalogue…'
+                    : `${visible.length} ${visible.length === 1 ? 'product' : 'products'} found${matches.fuzzy ? ' · Showing close matches' : ''}`
+                  : 'The neighbourhood favourites. Always a good choice.'}
+              </p>
             </div>
             <span className="text-link">
               {visible.length} fresh finds <Leaf size={13} />
@@ -540,11 +679,7 @@ export default function Storefront() {
                 key={c.id}
                 onClick={() => setCategory(c.id)}
               >
-                {c.id === 'produce'
-                  ? 'Farm fresh'
-                  : c.id === 'dairy'
-                    ? 'Daily essentials'
-                    : 'Pantry picks'}
+                {c.name}
               </button>
             ))}
             <select
@@ -552,12 +687,12 @@ export default function Storefront() {
               value={sort}
               onChange={(e) => setSort(e.target.value)}
             >
-              <option value="popular">Our favourites</option>
+              <option value="popular">{searchActive ? 'Relevance' : 'Our favourites'}</option>
               <option value="low">Price: low to high</option>
               <option value="discount">Best savings</option>
             </select>
           </div>
-          {error && <ErrorNotice message={error} onRetry={load} />}
+          {error && <ErrorNotice message={error} onRetry={() => void load()} />}
           <div className="product-grid">
             {loading
               ? Array.from({ length: 6 }, (_, i) => <div className="skeleton" key={i} />)
@@ -598,8 +733,10 @@ export default function Storefront() {
           </div>
           {!loading && !visible.length && !error && (
             <Empty
-              title="No finds just yet"
-              detail="Try another search or explore our other categories."
+              title={
+                searchActive ? `No products found for “${search.trim()}”` : 'No finds just yet'
+              }
+              detail="Try a product name, brand or category, or check your spelling."
               action={
                 <button
                   className="secondary"
@@ -634,20 +771,22 @@ export default function Storefront() {
               'pantry',
               'photo-1586201375761-83865001e31c',
             ],
-          ].map(([label, title, id, img]) => (
-            <div className="promo" key={id}>
-              <span className="eyebrow">{label}</span>
-              <h3 style={{ whiteSpace: 'pre-line' }}>{title}</h3>
-              <button className="text-link" onClick={() => chooseCategory(id)}>
-                Shop the collection <ArrowUpRight size={12} />
-              </button>
-              <img
-                src={mediaUrl(homepage[id as keyof HomepageImages] || photo(img, 300))}
-                alt=""
-                loading="lazy"
-              />
-            </div>
-          ))}
+          ]
+            .filter(([, , id]) => categories.some((item) => item.id === id))
+            .map(([label, title, id, img]) => (
+              <div className="promo" key={id}>
+                <span className="eyebrow">{label}</span>
+                <h3 style={{ whiteSpace: 'pre-line' }}>{title}</h3>
+                <button className="text-link" onClick={() => chooseCategory(id)}>
+                  Shop the collection <ArrowUpRight size={12} />
+                </button>
+                <img
+                  src={mediaUrl(homepage[id as keyof HomepageImages] || photo(img, 300))}
+                  alt=""
+                  loading="lazy"
+                />
+              </div>
+            ))}
         </section>
         <section className="neighbourhood">
           <div className="flex">

@@ -7,6 +7,7 @@ import {
   ChartNoAxesCombined,
   ClipboardList,
   LayoutDashboard,
+  LayoutGrid,
   Leaf,
   LogOut,
   Package,
@@ -20,12 +21,12 @@ import {
   Wallet,
 } from 'lucide-react';
 import { PhotoPicker } from './photo-picker';
+import { CategoryManager, type AdminCategory } from './category-manager';
 import { signInOwner, finishOwnerSignIn, adminSignInError } from './sign-in';
 import { api, request } from '@daybasket/api-client';
 import {
   type Product,
   type HomepageImages,
-  type Category,
   type User,
   type Order,
   money,
@@ -51,7 +52,7 @@ export default function Admin() {
     [busy, setBusy] = useState(false),
     [tab, setTab] = useState('overview'),
     [products, setProducts] = useState<Product[]>([]),
-    [categories, setCategories] = useState<Category[]>([]),
+    [categories, setCategories] = useState<AdminCategory[]>([]),
     [orders, setOrders] = useState<Order[]>([]),
     [analytics, setAnalytics] = useState<Analytics | null>(null),
     [audit, setAudit] = useState<Audit[]>([]),
@@ -79,14 +80,14 @@ export default function Admin() {
     try {
       const [p, c, o, a, log, d] = await Promise.all([
         request<Product[]>('/admin/products'),
-        api.catalogue(),
+        request<AdminCategory[]>('/admin/categories'),
         api.orders(),
         request<Analytics>('/admin/analytics'),
         request<Audit[]>('/admin/audit'),
         request<{ id: string; name: string }[]>('/admin/drivers'),
       ]);
       setProducts(p);
-      setCategories(c.categories);
+      setCategories(c);
       setOrders(o);
       setAnalytics(a);
       setAudit(log);
@@ -155,6 +156,11 @@ export default function Admin() {
   }
   async function saveProduct(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (busy || uploading) return;
+    if (!categories.some((category) => category.id === editing?.categoryId)) {
+      setError('Choose an available category before saving this product.');
+      return;
+    }
     const f = new FormData(e.currentTarget);
     const body = {
       name: f.get('name'),
@@ -180,6 +186,24 @@ export default function Admin() {
     )
       setEditing(null);
   }
+  async function openProduct(product?: Product) {
+    if (busy) return;
+    setBusy(true);
+    setError('');
+    try {
+      const available = await request<AdminCategory[]>('/admin/categories');
+      setCategories(available);
+      setEditing(
+        product
+          ? { ...product, images: product.images?.length ? product.images : [product.image] }
+          : { active: true, taxBps: 0, maxQuantity: 10, categoryId: available[0]?.id },
+      );
+    } catch (error) {
+      setError((error as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
   function exportOrders() {
     const escape = (s: unknown) =>
       '"' +
@@ -196,7 +220,7 @@ export default function Admin() {
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'daybasket-orders.csv';
+    a.download = 'gupta-mart-orders.csv';
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -284,7 +308,7 @@ export default function Admin() {
               for more.
             </p>
           </div>
-          <small>DAYBASKET · STORE STUDIO</small>
+          <small>GUPTA MART · STORE STUDIO</small>
         </div>
         <div className="login-form-wrap">
           <form className="login-form" onSubmit={login}>
@@ -340,6 +364,7 @@ export default function Admin() {
             ['overview', LayoutDashboard, 'Overview'],
             ['orders', ShoppingBag, 'Orders'],
             ['products', Package, 'Products'],
+            ['categories', LayoutGrid, 'Categories'],
             ['homepage', Leaf, 'Homepage offers'],
             ['delivery', Truck, 'Deliveries'],
             ['audit', ShieldCheck, 'Audit log'],
@@ -407,16 +432,20 @@ export default function Admin() {
                       ? 'Every basket has a story.'
                       : tab === 'products'
                         ? 'Good things on your shelves.'
-                        : tab === 'delivery'
-                          ? 'From your store to their door.'
-                          : 'A clear record of every change.'}
+                        : tab === 'categories'
+                          ? 'Your store, your categories.'
+                          : tab === 'delivery'
+                            ? 'From your store to their door.'
+                            : 'A clear record of every change.'}
               </h1>
               <p>
                 {tab === 'overview'
                   ? 'A fresh look at what’s happening in your neighbourhood.'
                   : tab === 'products'
                     ? 'Curate your catalogue, adjust stock, and keep things fresh.'
-                    : 'Keep your store running with a little extra care.'}
+                    : tab === 'categories'
+                      ? 'Add, edit, and organise the categories customers shop in your store.'
+                      : 'Keep your store running with a little extra care.'}
               </p>
             </div>
             <div className="flex">
@@ -557,19 +586,23 @@ export default function Admin() {
                 <button
                   className="primary"
                   style={{ marginLeft: 'auto', fontSize: 11 }}
-                  onClick={() => {
-                    setError('');
-                    setEditing({
-                      active: true,
-                      taxBps: 0,
-                      maxQuantity: 10,
-                      categoryId: categories[0]?.id,
-                    });
-                  }}
+                  disabled={busy || !categories.length}
+                  onClick={() => void openProduct()}
                 >
                   <Plus size={14} /> Add product
                 </button>
               </div>
+              {!categories.length && (
+                <Empty
+                  title="Add your first category"
+                  detail="Products need a category so customers can find them."
+                  action={
+                    <button className="primary" onClick={() => setTab('categories')}>
+                      Manage categories
+                    </button>
+                  }
+                />
+              )}
               <section className="panel">
                 <div className="table-scroll">
                   <table>
@@ -615,13 +648,8 @@ export default function Admin() {
                             <td>
                               <button
                                 className="text-link"
-                                onClick={() => {
-                                  setError('');
-                                  setEditing({
-                                    ...p,
-                                    images: p.images?.length ? p.images : [p.image],
-                                  });
-                                }}
+                                disabled={busy}
+                                onClick={() => void openProduct(p)}
                               >
                                 Edit <ArrowRight size={12} />
                               </button>
@@ -656,6 +684,15 @@ export default function Admin() {
               </section>
             </>
           )}
+          {tab === 'categories' && (
+            <CategoryManager
+              categories={categories}
+              onSaved={async (message) => {
+                await refresh();
+                setNotice(message);
+              }}
+            />
+          )}
           {tab === 'homepage' && (
             <section className="panel" style={{ padding: 24 }}>
               <h2>Make the homepage yours</h2>
@@ -666,7 +703,7 @@ export default function Admin() {
               <div className="form-grid">
                 {(
                   [
-                    ['heroEyebrow', 'Main banner — small heading', 'THIS WEEK AT DAYBASKET', 80],
+                    ['heroEyebrow', 'Main banner — small heading', 'THIS WEEK AT GUPTA MART', 80],
                     ['heroTitle', 'Main banner — offer title', 'Fresh picks. Great offers.', 100],
                     [
                       'heroDescription',
@@ -867,7 +904,19 @@ export default function Admin() {
                 </label>
                 <label className="field">
                   Category
-                  <select name="categoryId" defaultValue={editing.categoryId}>
+                  <select
+                    name="categoryId"
+                    value={
+                      categories.some((category) => category.id === editing.categoryId)
+                        ? editing.categoryId
+                        : ''
+                    }
+                    onChange={(event) => setEditing({ ...editing, categoryId: event.target.value })}
+                    required
+                  >
+                    <option value="" disabled>
+                      Choose a category
+                    </option>
                     {categories.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.name}
@@ -949,7 +998,15 @@ export default function Admin() {
                 Active in storefront
               </label>
               {error && <ErrorNotice message={error} />}
-              <button className="primary" disabled={busy || uploading || !editing.image}>
+              <button
+                className="primary"
+                disabled={
+                  busy ||
+                  uploading ||
+                  !editing.image ||
+                  !categories.some((category) => category.id === editing.categoryId)
+                }
+              >
                 Save product <CheckIcon />
               </button>
             </form>

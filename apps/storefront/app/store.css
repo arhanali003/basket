@@ -48,6 +48,8 @@
   font-size: 12px;
 }
 .search-box {
+  position: relative;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -60,11 +62,71 @@
   color: #748070;
 }
 .search-box input {
+  width: 100%;
+  min-width: 0;
   background: none;
   border: 0;
   font-size: 12px;
   padding: 8px 0;
   outline: none;
+}
+.search-clear,
+.search-submit {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  padding: 5px;
+  color: var(--green);
+}
+.search-suggestions {
+  position: absolute;
+  inset: calc(100% + 8px) 0 auto;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  max-height: min(360px, 55vh);
+  overflow-y: auto;
+  z-index: 50;
+}
+.search-suggestions li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 7px;
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--ink);
+}
+.search-suggestions li:hover,
+.search-suggestions li.selected {
+  background: var(--soft);
+}
+.search-suggestions img {
+  width: 36px;
+  height: 40px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+.search-suggestions li > span {
+  min-width: 0;
+  flex: 1;
+}
+.search-suggestions b {
+  display: block;
+  font-size: 12px;
+}
+.search-suggestions small {
+  display: block;
+  font-size: 10px;
+  margin-top: 4px;
+  color: var(--muted);
+}
+.search-suggestions strong {
+  font-size: 12px;
 }
 .search-box kbd {
   font-size: 10px;

@@ -29,8 +29,10 @@ import {
   checkoutSchema,
   productSchema,
   homepageSchema,
+  imageSchema,
 } from '../../../packages/types/src';
 import { Database } from './database';
+import { searchProducts } from '../../../packages/types/src/search';
 import {
   requireCustomer,
   requireStaff,
@@ -47,6 +49,12 @@ const includeOrder = {
 };
 const challenges = new Map<string, { phone: string; expires: number; attempts: number }>();
 const staff = ['super_admin', 'staff'];
+const normalizeCategoryName = (name: string) => name.trim().replace(/\s+/g, ' ');
+const categorySchema = z.object({
+  name: z.string().transform(normalizeCategoryName).pipe(z.string().min(1).max(80)),
+  image: imageSchema,
+  color: z.string().regex(/^#(?:[\da-f]{3}|[\da-f]{6})$/i, 'Choose a valid category color'),
+});
 const deliveryCode = (id: string) =>
   String(
     (parseInt(
@@ -59,7 +67,7 @@ const deliveryCode = (id: string) =>
       9000) +
       1000,
   );
-@ApiTags('Daybasket')
+@ApiTags('Gupta Mart')
 @Controller('api/v1')
 export class ApiController {
   constructor(
@@ -75,7 +83,7 @@ export class ApiController {
   }
   @Get('config') config() {
     return {
-      brand: 'Daybasket',
+      brand: 'Gupta Mart',
       developmentPlaceholder: true,
       mockProviders: mockMode,
       minimumOrder: 9900,
@@ -228,26 +236,21 @@ export class ApiController {
     return { ok: true };
   }
   @Get('catalogue') async catalogue(@Query('q') q = '', @Query('category') category = '') {
-    return {
-      products: await this.db.product.findMany({
+    const [products, categories] = await Promise.all([
+      this.db.product.findMany({
         where: {
           active: true,
           deletedAt: null,
           ...(category ? { categoryId: category } : {}),
-          ...(q
-            ? {
-                OR: [
-                  { name: { contains: q.slice(0, 100) } },
-                  { brand: { contains: q.slice(0, 100) } },
-                ],
-              }
-            : {}),
         },
         include: { inventory: { where: { storeId: 'indiranagar' }, select: { available: true } } },
         orderBy: { createdAt: 'asc' },
-        take: 100,
       }),
-      categories: await this.db.category.findMany(),
+      this.db.category.findMany({ orderBy: { name: 'asc' } }),
+    ]);
+    return {
+      products: searchProducts(products, categories, typeof q === 'string' ? q : '').products,
+      categories,
     };
   }
   @Get('products/:id') async product(@Param('id') id: string) {
@@ -569,6 +572,114 @@ export class ApiController {
       await tx.wishlist.deleteMany({ where: { productId: id } });
       await tx.auditLog.create({ data: { actorId: u.id, action: 'delete_product', entityId: id } });
       return { ok: true };
+    });
+  }
+  private async categoryChange<T>(operation: (tx: Prisma.TransactionClient) => Promise<T>) {
+    try {
+      // Serializing the name check with the write prevents concurrent duplicate names.
+      return await this.db.$transaction(operation, {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === 'P2025') throw new NotFoundException('Category not found');
+        if (['P2002', 'P2003', 'P2034', 'P2028'].includes(error.code))
+          throw new ConflictException('Categories or products changed. Refresh and try again.');
+      }
+      throw error;
+    }
+  }
+  private async checkCategoryName(tx: Prisma.TransactionClient, name: string, exceptId?: string) {
+    const categories = await tx.category.findMany({ select: { id: true, name: true } });
+    if (
+      categories.some(
+        (category) =>
+          category.id !== exceptId &&
+          normalizeCategoryName(category.name).toLowerCase() === name.toLowerCase(),
+      )
+    )
+      throw new ConflictException('A category with this name already exists');
+  }
+  @Get('admin/categories') async adminCategories(@Req() req: Request) {
+    await this.auth.user(req, staff);
+    const categories = await this.db.category.findMany({
+      include: { _count: { select: { products: true } } },
+    });
+    // Include inactive and soft-deleted products: these still reference the category.
+    return categories.map(({ _count, ...category }) => ({
+      ...category,
+      productCount: _count.products,
+    }));
+  }
+  @Post('admin/categories') async createCategory(@Req() req: Request, @Body() body: unknown) {
+    const u = await this.auth.user(req, staff);
+    const data = categorySchema.parse(body);
+    return this.categoryChange(async (tx) => {
+      await this.checkCategoryName(tx, data.name);
+      const category = await tx.category.create({ data: { id: randomUUID(), ...data } });
+      await tx.auditLog.create({
+        data: { actorId: u.id, action: 'create_category', entityId: category.id },
+      });
+      return { ...category, productCount: 0 };
+    });
+  }
+  @Put('admin/categories/:id') async editCategory(
+    @Req() req: Request,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ) {
+    const u = await this.auth.user(req, staff);
+    const data = categorySchema.parse(body);
+    return this.categoryChange(async (tx) => {
+      if (!(await tx.category.findUnique({ where: { id } })))
+        throw new NotFoundException('Category not found');
+      await this.checkCategoryName(tx, data.name, id);
+      const { _count, ...category } = await tx.category.update({
+        where: { id },
+        data,
+        include: { _count: { select: { products: true } } },
+      });
+      await tx.auditLog.create({ data: { actorId: u.id, action: 'edit_category', entityId: id } });
+      return { ...category, productCount: _count.products };
+    });
+  }
+  @Delete('admin/categories/:id') async deleteCategory(
+    @Req() req: Request,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ) {
+    const u = await this.auth.user(req, staff);
+    const { replacementCategoryId } = z
+      .object({ replacementCategoryId: z.string().trim().min(1).optional() })
+      .parse(body ?? {});
+    if (replacementCategoryId === id)
+      throw new BadRequestException('Choose a different category for these products');
+    return this.categoryChange(async (tx) => {
+      const category = await tx.category.findUnique({
+        where: { id },
+        include: { _count: { select: { products: true } } },
+      });
+      if (!category) throw new NotFoundException('Category not found');
+      if (
+        replacementCategoryId &&
+        !(await tx.category.findUnique({ where: { id: replacementCategoryId } }))
+      )
+        throw new BadRequestException('The replacement category no longer exists');
+      if (category._count.products && !replacementCategoryId)
+        throw new ConflictException('Choose another category to move these products into first');
+      let movedProducts = 0;
+      if (replacementCategoryId) {
+        const moved = await tx.product.updateMany({
+          where: { categoryId: id },
+          data: { categoryId: replacementCategoryId },
+        });
+        movedProducts = moved.count;
+      }
+      await tx.category.delete({ where: { id } });
+      await tx.auditLog.create({
+        data: { actorId: u.id, action: 'delete_category', entityId: id },
+      });
+      return { ok: true, movedProducts };
     });
   }
   @Get('admin/products') async adminProducts(@Req() req: Request) {

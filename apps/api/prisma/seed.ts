@@ -8,7 +8,7 @@ async function seed() {
     update: {},
     create: {
       id: 'indiranagar',
-      name: 'Daybasket Indiranagar',
+      name: 'Gupta Mart Indiranagar',
       latitude: 12.9784,
       longitude: 77.6408,
       radiusKm: 8,
@@ -228,7 +228,7 @@ async function seed() {
     create: { code: 'HELLO10', discountBps: 1000, minimum: 29900, maximum: 10000 },
   });
   console.log(
-    'Seeded Daybasket catalogue. Development accounts:',
+    'Seeded Gupta Mart catalogue. Development accounts:',
     process.env.NODE_ENV !== 'production',
   );
 }

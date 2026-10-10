@@ -57,7 +57,8 @@ export default function Delivery() {
       off = () => setOnline(false);
     window.addEventListener('online', on);
     window.addEventListener('offline', off);
-    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+    if ('serviceWorker' in navigator)
+      navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).catch(() => {});
     return () => {
       window.removeEventListener('online', on);
       window.removeEventListener('offline', off);
@@ -232,7 +233,7 @@ export default function Delivery() {
                 <div className="delivery-route">
                   <div className="route-stop">
                     <small>Pick up from</small>
-                    <b>Daybasket · Indiranagar</b>
+                    <b>Gupta Mart · Indiranagar</b>
                     <p>
                       {o.items.reduce((s, i) => s + i.quantity, 0)} items · Verify the packing list
                       at the store
