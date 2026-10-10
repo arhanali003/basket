@@ -328,7 +328,7 @@ test('offline resumes do not reload or discard input, and CSS recovers after rec
   await expect(page.getByLabel('Search products')).toHaveValue('avocados');
 });
 
-test('unavailable deployment CSS triggers at most one reload per stylesheet version and retains the saved basket', async ({
+test('unavailable deployment CSS triggers at most one reload in a recovery window and retains the saved basket', async ({
   page,
 }) => {
   await openStore(page);

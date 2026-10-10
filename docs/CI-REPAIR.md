@@ -23,6 +23,9 @@ uses its production build; admin and delivery use development-only demo sign-in.
   traffic retains its existing limit. Rate-limited responses include Retry-After.
 - Basket persistence waits for saved state to finish loading before writing it.
   Unavailable/quota-limited browser storage no longer crashes the shopping UI.
+- Asset recovery also limits reloads to once per minute across changing asset
+  URLs, preventing rapid deployments or development asset timestamps from
+  bypassing the existing per-version reload guard.
 - Regression tests cover saved baskets, blocked storage and rate-limit routing.
 
 ## Reproduce safely

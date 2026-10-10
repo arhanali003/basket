@@ -95,6 +95,10 @@ export function AssetRecovery() {
         // Verify that fresh HTML is reachable before a single guarded reload.
         const fingerprint = [...sheets.keys()].sort().join('|');
         if (sessionStorage.getItem(reloadKey) === fingerprint) return;
+        // Development servers and rapid deployments may change the URL on every
+        // reload. A second, time-based guard prevents a new fingerprint looping.
+        const lastReload = Number(sessionStorage.getItem(`${reloadKey}:at`) || 0);
+        if (Date.now() - lastReload < 60000) return;
         const response = await fetch(location.href, {
           cache: 'no-store',
           credentials: 'same-origin',
@@ -109,6 +113,7 @@ export function AssetRecovery() {
         )
           return;
         sessionStorage.setItem(reloadKey, fingerprint);
+        sessionStorage.setItem(`${reloadKey}:at`, String(Date.now()));
         location.reload();
       } catch {
         // Offline networks and unavailable storage must never cause reload loops.
