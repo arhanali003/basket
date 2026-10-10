@@ -27,6 +27,9 @@ uses its production build; admin and delivery use development-only demo sign-in.
   URLs, preventing rapid deployments or development asset timestamps from
   bypassing the existing per-version reload guard.
 - Regression tests cover saved baskets, blocked storage and rate-limit routing.
+- The populated-category UI test uses disposable categories and a real product
+  instead of intercepted catalogue responses, and verifies the product's new
+  category through the API. Only generated fixtures are moved or archived.
 
 ## Reproduce safely
 

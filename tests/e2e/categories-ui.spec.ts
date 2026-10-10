@@ -92,7 +92,7 @@ test('owner creates, edits and deletes categories and product editor uses the la
   }
 });
 
-test('populated-category confirmation requires a destination and submits a product move', async ({
+test('populated-category confirmation requires a destination and moves its products', async ({
   page,
 }) => {
   expect(
@@ -102,61 +102,71 @@ test('populated-category confirmation requires a destination and submits a produ
       })
     ).ok(),
   ).toBeTruthy();
+  const original = await (await page.request.get(base + '/admin/categories')).json();
+  expect(original.length).toBeGreaterThan(0);
+  const categoryIds: string[] = [];
+  let productId = '';
   const suffix = randomUUID();
-  const source = {
-    id: `source-${suffix}`,
-    name: 'Source category',
-    image: 'https://example.com/category.png',
-    color: '#eef2e5',
-    productCount: 3,
-  };
-  const destination = {
-    ...source,
-    id: `destination-${suffix}`,
-    name: 'Destination category',
-    productCount: 0,
-  };
-  let deleted = false;
-  let submitted: unknown;
-  const corsHeaders = {
-    'access-control-allow-origin': 'http://localhost:3001',
-    'access-control-allow-credentials': 'true',
-    'access-control-allow-methods': 'GET, DELETE, OPTIONS',
-    'access-control-allow-headers': 'content-type',
-  };
-  // Isolate the confirmation behaviour without moving real or seeded products.
-  await page.route(base + '/admin/categories', async (route) => {
-    if (route.request().method() === 'OPTIONS') {
-      await route.fulfill({ status: 204, headers: corsHeaders });
-      return;
+  // Real, disposable local fixtures verify that the UI actually moves products.
+  // No browser request interception or production/seeded product changes are needed.
+  try {
+    for (const name of [`Source ${suffix}`, `Destination ${suffix}`]) {
+      const created = await page.request.post(base + '/admin/categories', {
+        data: { name, image: 'https://example.com/category.png', color: '#eef2e5' },
+      });
+      expect(created.status()).toBe(201);
+      categoryIds.push((await created.json()).id);
     }
-    await route.fulfill({
-      headers: corsHeaders,
-      json: deleted ? [destination] : [source, destination],
+    const [sourceId, destinationId] = categoryIds;
+    const created = await page.request.post(base + '/admin/products', {
+      data: {
+        name: `Category move fixture ${suffix}`,
+        slug: `category-move-${suffix}`,
+        categoryId: sourceId,
+        brand: 'Test',
+        description: 'Disposable category-movement fixture',
+        image: 'https://example.com/product.png',
+        unit: '1 pack',
+        price: 10000,
+        mrp: 10000,
+      },
     });
-  });
-  await page.route(base + '/admin/categories/' + source.id, async (route) => {
-    if (route.request().method() === 'OPTIONS') {
-      await route.fulfill({ status: 204, headers: corsHeaders });
-      return;
+    expect(created.status()).toBe(201);
+    productId = (await created.json()).id;
+
+    await page.goto('http://localhost:3001');
+    await page.getByRole('button', { name: 'Categories', exact: true }).click();
+    const row = page.getByRole('row').filter({ hasText: `Source ${suffix}` });
+    await row.getByRole('button', { name: 'Delete', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Delete category?' });
+    await expect(dialog.getByText(/No products will be deleted/)).toBeVisible();
+    await expect(
+      dialog.getByRole('button', { name: 'Delete category', exact: true }),
+    ).toBeDisabled();
+    await dialog
+      .getByRole('combobox', { name: 'Move products to', exact: true })
+      .selectOption(destinationId);
+    await dialog.getByRole('button', { name: 'Delete category', exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(row).toHaveCount(0);
+    const moved = await page.request.get(base + '/products/' + productId);
+    expect(moved.status()).toBe(200);
+    expect(await moved.json()).toMatchObject({ id: productId, categoryId: destinationId });
+    const categories = await (await page.request.get(base + '/admin/categories')).json();
+    expect(categories.find((category: { id: string }) => category.id === sourceId)).toBeUndefined();
+    expect(
+      categories.find((category: { id: string }) => category.id === destinationId),
+    ).toMatchObject({ productCount: 1 });
+  } finally {
+    // The API retains soft-deleted products, so detach only our generated fixtures
+    // from their temporary categories before archiving them.
+    for (const id of categoryIds) {
+      const removed = await page.request.delete(base + '/admin/categories/' + id, {
+        data: { replacementCategoryId: original[0].id },
+      });
+      expect([200, 404]).toContain(removed.status());
     }
-    expect(route.request().method()).toBe('DELETE');
-    submitted = route.request().postDataJSON();
-    deleted = true;
-    await route.fulfill({ headers: corsHeaders, json: { ok: true, movedProducts: 3 } });
-  });
-  await page.goto('http://localhost:3001');
-  await page.getByRole('button', { name: 'Categories', exact: true }).click();
-  const row = page.getByRole('row').filter({ hasText: source.name });
-  await row.getByRole('button', { name: 'Delete', exact: true }).click();
-  const dialog = page.getByRole('dialog', { name: 'Delete category?' });
-  await expect(dialog.getByText(/No products will be deleted/)).toBeVisible();
-  await expect(dialog.getByRole('button', { name: 'Delete category', exact: true })).toBeDisabled();
-  await dialog
-    .getByRole('combobox', { name: 'Move products to', exact: true })
-    .selectOption(destination.id);
-  await dialog.getByRole('button', { name: 'Delete category', exact: true }).click();
-  await expect(dialog).toHaveCount(0);
-  await expect(row).toHaveCount(0);
-  expect(submitted).toEqual({ replacementCategoryId: destination.id });
+    if (productId)
+      expect((await page.request.delete(base + '/admin/products/' + productId)).ok()).toBeTruthy();
+  }
 });
