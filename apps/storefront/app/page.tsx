@@ -62,8 +62,8 @@ export default function Storefront() {
     [geoLabel, setGeoLabel] = useState(''),
     [quote, setQuote] = useState<Quote | null>(null),
     [coupon, setCoupon] = useState(''),
-    [appliedCoupon, setAppliedCoupon] = useState(''),
-    [payment, setPayment] = useState<'cod' | 'mock'>('cod');
+    [appliedCoupon, setAppliedCoupon] = useState('');
+  const payment = 'cod' as const;
   const [orders, setOrders] = useState<Order[]>([]),
     [tracking, setTracking] = useState<(Order & { deliveryCode?: string }) | null>(null),
     [live, setLive] = useState(false);
@@ -573,7 +573,7 @@ export default function Storefront() {
         </nav>
       </header>
       <main className="store-main">
-        {!searchActive && (
+        {!searchActive && homepage.hero && (
           <section className="hero-grid" aria-label="Weekly specials">
             <div className="hero-main">
               <div className="hero-copy">
@@ -761,43 +761,6 @@ export default function Storefront() {
               }
             />
           )}
-        </section>
-        <section className="promos" aria-label="Curated collections">
-          {[
-            [
-              'YOUR DAILY BREAD',
-              'Rise & shine.\nFreshly baked.',
-              'dairy',
-              'photo-1598373182133-52452f7691ef',
-            ],
-            [
-              'THE GOOD STUFF',
-              'Small bites.\nBig happy.',
-              'snacks',
-              'photo-1499636136210-6f4ee915583e',
-            ],
-            [
-              'STOCK UP, SLOW DOWN',
-              'A well-stocked\nkind of day.',
-              'pantry',
-              'photo-1586201375761-83865001e31c',
-            ],
-          ]
-            .filter(([, , id]) => categories.some((item) => item.id === id))
-            .map(([label, title, id, img]) => (
-              <div className="promo" key={id}>
-                <span className="eyebrow">{label}</span>
-                <h3 style={{ whiteSpace: 'pre-line' }}>{title}</h3>
-                <button className="text-link" onClick={() => chooseCategory(id)}>
-                  Shop the collection <ArrowUpRight size={12} />
-                </button>
-                <img
-                  src={mediaUrl(homepage[id as keyof HomepageImages] || photo(img, 300))}
-                  alt=""
-                  loading="lazy"
-                />
-              </div>
-            ))}
         </section>
         <section className="neighbourhood">
           <div className="flex">
@@ -1109,30 +1072,12 @@ export default function Storefront() {
                 <small>Choose an address to check delivery availability.</small>
               )}
             </div>
-            <label className="payment-option">
-              <input
-                type="radio"
-                name="payment"
-                checked={payment === 'cod'}
-                onChange={() => setPayment('cod')}
-              />
+            <div className="payment-option">
               <span>
                 <b>Cash on delivery</b>
-                <small>Pay when your goodness arrives</small>
+                <small>Pay when your order arrives</small>
               </span>
-            </label>
-            <label className="payment-option">
-              <input
-                type="radio"
-                name="payment"
-                checked={payment === 'mock'}
-                onChange={() => setPayment('mock')}
-              />
-              <span>
-                <b>Test online payment</b>
-                <small>Development only · No money will be charged</small>
-              </span>
-            </label>
+            </div>
             {formError && <ErrorNotice message={formError} />}
             <button
               className="primary full"
