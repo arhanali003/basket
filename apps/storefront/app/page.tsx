@@ -13,7 +13,6 @@ import {
   Plus,
   Search,
   ShoppingBasket,
-  Sparkles,
   Truck,
   UserRound,
   X,
@@ -404,13 +403,6 @@ export default function Storefront() {
   }
   return (
     <>
-      <div className="announcement">
-        <Sparkles size={11} />
-        <span>
-          A little welcome gift: <b>10% off your basket</b> with HELLO10 · Min. ₹299
-        </span>
-        <ArrowRight size={11} />
-      </div>
       <header className="site-header">
         <div className="header-main">
           <Logo />
@@ -418,7 +410,9 @@ export default function Storefront() {
             <MapPin size={19} />
             <span>
               <small>Delivering goodness to</small>
-              <b>{address ? address.label + ' · ' + address.city : 'Indiranagar, Bengaluru'}</b>
+              <b>
+                {address ? address.label + ' · ' + address.city : 'Choose your delivery address'}
+              </b>
             </span>
             <ChevronDown size={13} />
           </button>
@@ -980,7 +974,7 @@ export default function Storefront() {
                 </div>
                 {quote.discount > 0 && (
                   <div>
-                    <span>HELLO10 savings</span>
+                    <span>Coupon savings</span>
                     <b>−{money(quote.discount)}</b>
                   </div>
                 )}

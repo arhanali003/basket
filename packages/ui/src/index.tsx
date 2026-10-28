@@ -116,7 +116,7 @@ export function Footer() {
       </div>
       <div>
         <b>Good things, thoughtfully delivered.</b>
-        <p>Development store · Bengaluru · Prices in INR</p>
+        <p>Prices in INR</p>
         <a href="/policies">
           Help & store policies <ArrowUpRight size={14} />
         </a>
