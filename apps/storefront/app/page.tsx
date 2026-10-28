@@ -416,9 +416,11 @@ export default function Storefront() {
           <button className="location-button" onClick={() => open(user ? 'location' : 'login')}>
             <MapPin size={19} />
             <span>
-              <small>Delivering goodness to</small>
+              <small>{address ? 'Delivering goodness to' : 'Store location'}</small>
               <b>
-                {address ? address.label + ' · ' + address.city : 'Choose your delivery address'}
+                {address
+                  ? address.label + ' · ' + address.city
+                  : homepage.storeAddress || 'Choose your delivery address'}
               </b>
             </span>
             <ChevronDown size={13} />
@@ -771,7 +773,7 @@ export default function Storefront() {
           </button>
         </section>
       </main>
-      <Footer />
+      <Footer storeAddress={homepage.storeAddress} />
       <nav className="mobile-nav" aria-label="Mobile navigation">
         <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
           <Home size={19} />

@@ -75,11 +75,11 @@ export default function Admin() {
   const [homepage, setHomepage] = useState<HomepageImages>({});
   const [deleting, setDeleting] = useState<Product | null>(null);
   useEffect(() => {
-    if (user && tab === 'homepage')
+    if (user)
       request<HomepageImages>('/homepage')
         .then(setHomepage)
         .catch((e) => setError(e.message));
-  }, [user, tab]);
+  }, [user]);
   async function refresh() {
     setError('');
     try {
@@ -447,7 +447,7 @@ export default function Admin() {
             <b>A little local. A lot of good.</b>
           </div>
           <p>
-            Indiranagar, Bengaluru
+            {homepage.storeAddress || 'Set store address in Homepage offers'}
             <br />
             {process.env.NODE_ENV === 'production' ? 'Store management' : 'Development store'}
           </p>
@@ -466,7 +466,8 @@ export default function Admin() {
       <main className="studio-main">
         <header className="studio-header">
           <span className="flex">
-            <Store size={16} /> Indiranagar store <span className="muted"> / {tab}</span>
+            <Store size={16} /> {homepage.storeAddress || 'Store address not set'}{' '}
+            <span className="muted"> / {tab}</span>
           </span>
           <span className="store-badge">
             <span>●</span>{' '}
@@ -764,6 +765,19 @@ export default function Admin() {
                 Write your own offers and upload banner photos, then save to publish them on the
                 storefront.
               </p>
+              <label className="field">
+                Store address shown on the website and admin page
+                <input
+                  type="text"
+                  value={homepage.storeAddress ?? ''}
+                  maxLength={200}
+                  placeholder="Enter your actual store address"
+                  disabled={busy}
+                  onChange={(event) =>
+                    setHomepage((current) => ({ ...current, storeAddress: event.target.value }))
+                  }
+                />
+              </label>
               <div className="form-grid">
                 {(
                   [

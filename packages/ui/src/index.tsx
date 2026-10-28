@@ -104,7 +104,7 @@ export function ErrorNotice({ message, onRetry }: { message: string; onRetry?: (
     </div>
   );
 }
-export function Footer() {
+export function Footer({ storeAddress }: { storeAddress?: string }) {
   return (
     <footer className="site-footer">
       <div>
@@ -116,6 +116,7 @@ export function Footer() {
       </div>
       <div>
         <b>Good things, thoughtfully delivered.</b>
+        {storeAddress && <p>{storeAddress}</p>}
         <p>Prices in INR</p>
         <a href="/policies">
           Help & store policies <ArrowUpRight size={14} />

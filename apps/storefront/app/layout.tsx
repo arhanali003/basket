@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   title: 'Gupta Mart — Everyday good, at your door',
   applicationName: 'Gupta Mart',
   description:
-    'Fresh groceries, pantry favourites and little everyday joys. Thoughtfully delivered in Bengaluru.',
+    'Fresh groceries, pantry favourites and little everyday joys. Thoughtfully delivered.',
   manifest: '/manifest.webmanifest',
   icons: {
     icon: [{ url: '/icon.svg', type: 'image/svg+xml' }],
