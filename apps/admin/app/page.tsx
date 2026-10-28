@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ArrowDownToLine,
   ArrowRight,
@@ -13,6 +13,7 @@ import {
   Package,
   Plus,
   RefreshCw,
+  Bell,
   ShieldCheck,
   ShoppingBag,
   Store,
@@ -63,6 +64,10 @@ export default function Admin() {
     [drivers, setDrivers] = useState<{ id: string; name: string }[]>([]),
     [driver, setDriver] = useState(''),
     [notice, setNotice] = useState('');
+  const [orderAlertsEnabled, setOrderAlertsEnabled] = useState(false);
+  const knownOrderIds = useRef<Set<string> | null>(null);
+  const alertAudio = useRef<AudioContext | null>(null);
+  const alertsEnabledRef = useRef(false);
   const [uploading, setUploading] = useState(false);
   const [confirmDelivery, setConfirmDelivery] = useState<Order | null>(null);
   const [confirmationCode, setConfirmationCode] = useState('');
@@ -86,6 +91,11 @@ export default function Admin() {
         request<Audit[]>('/admin/audit'),
         request<{ id: string; name: string }[]>('/admin/drivers'),
       ]);
+      const nextIds = new Set(o.map((order) => order.id));
+      const newOrders = knownOrderIds.current
+        ? o.filter((order) => !knownOrderIds.current?.has(order.id))
+        : [];
+      knownOrderIds.current = nextIds;
       setProducts(p);
       setCategories(c);
       setOrders(o);
@@ -93,6 +103,32 @@ export default function Admin() {
       setAudit(log);
       setDrivers(d);
       setDriver(d[0]?.id || '');
+      if (newOrders.length && alertsEnabledRef.current) {
+        const audio = alertAudio.current;
+        if (audio) {
+          void audio
+            .resume()
+            .then(() => {
+              const tone = audio.createOscillator();
+              const volume = audio.createGain();
+              tone.type = 'sine';
+              tone.frequency.setValueAtTime(880, audio.currentTime);
+              tone.frequency.setValueAtTime(1175, audio.currentTime + 0.15);
+              volume.gain.setValueAtTime(0.12, audio.currentTime);
+              volume.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + 0.35);
+              tone.connect(volume).connect(audio.destination);
+              tone.start();
+              tone.stop(audio.currentTime + 0.35);
+            })
+            .catch(() => {});
+        }
+        setNotice(`${newOrders.length} new order${newOrders.length === 1 ? '' : 's'} received`);
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification('New Gupta Mart order', {
+            body: `${newOrders.length} new order${newOrders.length === 1 ? '' : 's'} received`,
+          });
+        }
+      }
     } catch (e) {
       setError((e as Error).message);
     }
@@ -117,6 +153,25 @@ export default function Admin() {
     const id = setInterval(refresh, 15000);
     return () => clearInterval(id);
   }, [user]);
+  async function enableOrderAlerts() {
+    if (alertsEnabledRef.current) {
+      alertsEnabledRef.current = false;
+      setOrderAlertsEnabled(false);
+      setNotice('Order alerts are off.');
+      return;
+    }
+    try {
+      alertAudio.current ??= new AudioContext();
+      await alertAudio.current.resume();
+      alertsEnabledRef.current = true;
+      setOrderAlertsEnabled(true);
+      if ('Notification' in window && Notification.permission === 'default')
+        void Notification.requestPermission().catch(() => {});
+      setNotice('New order sound is on. Keep this admin page open for alerts.');
+    } catch {
+      setError('Sound could not start. Check your browser sound settings and try again.');
+    }
+  }
   async function login(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
@@ -449,6 +504,15 @@ export default function Admin() {
               </p>
             </div>
             <div className="flex">
+              <button
+                className="secondary"
+                onClick={enableOrderAlerts}
+                aria-label={
+                  orderAlertsEnabled ? 'Turn off order alerts' : 'Enable new order alerts'
+                }
+              >
+                <Bell size={14} /> {orderAlertsEnabled ? 'Order alerts on' : 'Enable order alerts'}
+              </button>
               <button className="icon-button" aria-label="Refresh dashboard" onClick={refresh}>
                 <RefreshCw size={16} />
               </button>
