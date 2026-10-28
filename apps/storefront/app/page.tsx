@@ -26,7 +26,6 @@ import {
   money,
   statuses,
   type Product,
-  type HomepageImages,
   type Category,
   type User,
   type CartLine,
@@ -35,8 +34,6 @@ import {
   type Order,
 } from '@daybasket/types';
 import { Logo, Modal, Footer, Empty, ErrorNotice, ProductGallery, mediaUrl } from '@daybasket/ui';
-const photo = (id: string, w = 900) =>
-  `https://images.unsplash.com/${id}?auto=format&fit=crop&w=${w}&q=85`;
 type Panel = 'login' | 'location' | 'cart' | 'orders' | 'product' | 'tracking' | null;
 export default function Storefront() {
   const [products, setProducts] = useState<Product[]>([]),
@@ -67,7 +64,6 @@ export default function Storefront() {
   const [orders, setOrders] = useState<Order[]>([]),
     [tracking, setTracking] = useState<(Order & { deliveryCode?: string }) | null>(null),
     [live, setLive] = useState(false);
-  const [homepage, setHomepage] = useState<HomepageImages>({});
   const [searchFocused, setSearchFocused] = useState(false);
   const [activeSuggestion, setActiveSuggestion] = useState(-1);
   const searchInput = useRef<HTMLInputElement>(null);
@@ -104,9 +100,6 @@ export default function Storefront() {
   }
   useEffect(() => {
     void load();
-    request<HomepageImages>('/homepage')
-      .then(setHomepage)
-      .catch(() => {});
     if ('serviceWorker' in navigator)
       navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).catch(() => {});
     try {
@@ -573,54 +566,6 @@ export default function Storefront() {
         </nav>
       </header>
       <main className="store-main">
-        {!searchActive && homepage.hero && (
-          <section className="hero-grid" aria-label="Weekly specials">
-            <div className="hero-main">
-              <div className="hero-copy">
-                <div className="eyebrow">
-                  <span>✳</span> {homepage.heroEyebrow ?? 'THIS WEEK AT GUPTA MART'}
-                </div>
-                <h1>{homepage.heroTitle ?? 'Fresh picks. Great offers.'}</h1>
-                <p>
-                  {homepage.heroDescription ??
-                    'Discover the latest offers on your everyday essentials.'}
-                </p>
-                <button
-                  className="primary"
-                  onClick={() => {
-                    setSort('discount');
-                    chooseCategory('all');
-                  }}
-                >
-                  {homepage.heroButton ?? 'Shop offers'} <ArrowUpRight size={14} />
-                </button>
-                <div className="hero-dots" aria-hidden="true">
-                  <i />
-                  <i />
-                  <i />
-                </div>
-              </div>
-              <img
-                className="hero-image"
-                src={mediaUrl(homepage.hero || photo('photo-1542838132-92c53300491e'))}
-                alt="Fresh finds from our store"
-                fetchPriority="high"
-              />
-            </div>
-            <div className="hero-side">
-              <span className="eyebrow">{homepage.sideEyebrow ?? 'MORE TO DISCOVER'}</span>
-              <h2>{homepage.sideTitle ?? 'Your daily essentials.'}</h2>
-              <p>{homepage.sideDescription ?? 'Find something good for every day.'}</p>
-              <button className="text-link" onClick={() => chooseCategory('all')}>
-                {homepage.sideButton ?? 'Explore the store'} <ArrowUpRight size={14} />
-              </button>
-              <img
-                src={mediaUrl(homepage.breakfast || photo('photo-1517673400267-0251440c45dc', 400))}
-                alt="Wholesome breakfast oats"
-              />
-            </div>
-          </section>
-        )}
         {!searchActive && (
           <section className="shop-section">
             <div className="section-heading">
